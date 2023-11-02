@@ -6,7 +6,8 @@ data = pd.read_csv('your_data.csv')
 
 # Function to display collapsible sections
 def display_collapsible_section(row):
-    with st.beta_expander(f"Row: {row.name}", expanded=False):
+    expander = st.beta_container()
+    with expander:
         for column in data.columns:
             if column.startswith("expected_") or column.startswith("actual_") or column.startswith("result_"):
                 st.write(f"{column}: {row[column]}")
