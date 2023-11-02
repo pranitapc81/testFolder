@@ -10,6 +10,9 @@ for index, row in csv_data.iterrows():
     
     # Display the key as a title and allow expansion
     with st.beta_expander(key):
+        # Create a header row
+        st.write("Field Name", "Expected", "Actual", "Result")
+        
         # Iterate through the columns with 'expected_', 'actual_', and 'result_'
         for col in csv_data.columns:
             if col.startswith('expected_'):
@@ -19,7 +22,4 @@ for index, row in csv_data.iterrows():
                 result_value = row['result_' + field_name]
                 
                 # Display the field name and values
-                st.write(f"Field Name: {field_name}")
-                st.write(f"Expected: {expected_value}")
-                st.write(f"Actual: {actual_value}")
-                st.write(f"Result: {result_value}")
+                st.write(field_name, expected_value, actual_value, result_value)
