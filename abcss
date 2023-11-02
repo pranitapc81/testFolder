@@ -1,27 +1,25 @@
 import streamlit as st
+import pandas as pd
 
-# Read the CSV data into a Pandas DataFrame
-df = pd.read_csv('csv_data.csv')
+# Load your CSV data
+csv_data = pd.read_csv('your_data.csv')
 
-# Create a function to transpose a row to a column
-def transpose_row_to_column(row):
-  """Transposes a row to a column with expected, actual, and result fields.
-
-  Args:
-    row: A Pandas Series.
-
-  Returns:
-    A Pandas DataFrame with one column per field.
-  """
-
-  df = pd.DataFrame(row)
-  df.columns = ['expected', 'actual', 'result']
-  return df
-
-# Transpose each row to a column
-df_transposed = df.apply(transpose_row_to_column, axis=1)
-
-# Display the data in Streamlit
-for index, row in df_transposed.iterrows():
-  with st.expander(f'Row {index + 1}'):
-    st.table(row.to_frame().T)
+# Iterate through each row in the CSV data
+for index, row in csv_data.iterrows():
+    key = row['key']
+    
+    # Display the key as a title and allow expansion
+    with st.beta_expander(key):
+        # Iterate through the columns with 'expected_', 'actual_', and 'result_'
+        for col in csv_data.columns:
+            if col.startswith('expected_'):
+                field_name = col[len('expected_'):]
+                expected_value = row[col]
+                actual_value = row['actual_' + field_name]
+                result_value = row['result_' + field_name]
+                
+                # Display the field name and values
+                st.write(f"Field Name: {field_name}")
+                st.write(f"Expected: {expected_value}")
+                st.write(f"Actual: {actual_value}")
+                st.write(f"Result: {result_value}")
