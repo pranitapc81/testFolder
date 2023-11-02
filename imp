@@ -9,7 +9,7 @@ key_columns = input("Enter the key column names separated by a comma: ").split('
 
 # Create a key for each row in the expected and actual DataFrames
 def create_key(row):
-    return '-'.join(row)
+    return '-'.join(str(x) if x is not None else "" for x in row)
 
 # Use both "Product" and "Price" as key columns
 key_columns = ["Product", "Price"]
