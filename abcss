@@ -1,47 +1,20 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
 
-# Read the Excel data into a Pandas DataFrame
-df = pd.read_excel('input.xlsx')
+# Load the CSV data
+data = pd.read_csv('your_data.csv')
 
-# Create a Streamlit sidebar to allow users to select the data to display
-st.sidebar.header('Select Data')
-series_options = df['expected_Series_reference'].unique()
-series_selection = st.sidebar.selectbox('Select Series:', series_options)
+# Function to display collapsible sections
+def display_collapsible_section(row):
+    with st.beta_expander(f"Row: {row.name}", expanded=False):
+        for column in data.columns:
+            if column.startswith("expected_") or column.startswith("actual_") or column.startswith("result_"):
+                st.write(f"{column}: {row[column]}")
 
-period_options = df['expected_Period'].unique()
-period_selection = st.sidebar.selectbox('Select Period:', period_options)
+# Main Streamlit app
+st.title('Data Display App')
+st.write('Displaying data with collapsible sections for "expected," "actual," and "result" fields.')
 
-# Filter the DataFrame based on the user's selections
-filtered_df = df[
-    (df['expected_Series_reference'] == series_selection)
-    & (df['expected_Period'] == period_selection)
-]
-
-# Display the filtered DataFrame in a table
-st.table(filtered_df)
-
-# Create a bar chart to visualize the data
-fig = go.Figure()
-fig.add_trace(go.Bar(x=filtered_df['expected_Series_title_1'], y=filtered_df['expected_Data_value']))
-fig.update_layout(title='Expected Data Values')
-
-# Add a slider to allow users to filter the data by a numeric range
-value_filter = st.slider('Filter by Value:', min(filtered_df['expected_Data_value']), max(filtered_df['expected_Data_value']))
-
-# Filter the DataFrame based on the slider value
-filtered_df = filtered_df[filtered_df['expected_Data_value'] >= value_filter]
-
-# Update the bar chart with the filtered data
-fig.update_traces(y=filtered_df['expected_Data_value'])
-
-# Display the bar chart
-st.plotly_chart(fig)
-
-# Allow users to drill down into the data by clicking on a data point
-st.write('Click on a data point to see more detailed information.')
-
-# Export the report to PDF and PowerPoint
-st.write(st.download_button(label='Download PDF', icon='file_pdf', data=filtered_df.to_pdf().encode('utf-8'), file_name='report.pdf', mime_type='application/pdf'))
-st.write(st.download_button(label='Download PowerPoint', icon='file_presentations', data=filtered_df.to_pptx().encode('utf-8'), file_name='report.pptx', mime_type='application/vnd.openxmlformats-officedocument.presentationml.presentation'))
+# Display data
+for index, row in data.iterrows():
+    display_collapsible_section(row)
