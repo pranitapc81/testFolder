@@ -1,21 +1,27 @@
 import streamlit as st
-import pandas as pd
 
-# Load the CSV data
-data = pd.read_csv('your_data.csv')
+# Read the CSV data into a Pandas DataFrame
+df = pd.read_csv('csv_data.csv')
 
-# Function to display collapsible sections
-def display_collapsible_section(row):
-    expander = st.beta_container()
-    with expander:
-        for column in data.columns:
-            if column.startswith("expected_") or column.startswith("actual_") or column.startswith("result_"):
-                st.write(f"{column}: {row[column]}")
+# Create a function to transpose a row to a column
+def transpose_row_to_column(row):
+  """Transposes a row to a column with expected, actual, and result fields.
 
-# Main Streamlit app
-st.title('Data Display App')
-st.write('Displaying data with collapsible sections for "expected," "actual," and "result" fields.')
+  Args:
+    row: A Pandas Series.
 
-# Display data
-for index, row in data.iterrows():
-    display_collapsible_section(row)
+  Returns:
+    A Pandas DataFrame with one column per field.
+  """
+
+  df = pd.DataFrame(row)
+  df.columns = ['expected', 'actual', 'result']
+  return df
+
+# Transpose each row to a column
+df_transposed = df.apply(transpose_row_to_column, axis=1)
+
+# Display the data in Streamlit
+for index, row in df_transposed.iterrows():
+  with st.expander(f'Row {index + 1}'):
+    st.table(row.to_frame().T)
