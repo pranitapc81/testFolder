@@ -1,105 +1,157 @@
 import pandas as pd
-pd.set_option('display.max_rows', None)
-pd.set_option('display.max_columns', None)
 
-# Load data from expected.csv and actual.csv files
-expected_df = pd.read_csv("expected.csv", dtype=str)
-actual_df = pd.read_csv("actual.csv", dtype=str)
+class DataComparer:
+    def __init__(self, expected_file, actual_file):
+        self.expected_file = expected_file
+        self.actual_file = actual_file
+        self.ignore_columns = ['Magnitude', 'Series_title_2']
+        self.key_columns = ["Series_reference", "price", "Period", "Data_value"]
+        self.unique_expected_keys = set()
+        self.unique_actual_keys = set()
 
-# Get the key header column names
-key_columns = ["Series_reference", "price", "Period", "Data_value"]
+    def load_data(self):
+        pd.set_option('display.max_rows', None)
+        pd.set_option('display.max_columns', None)
+        self.expected_df = pd.read_csv(self.expected_file, dtype=str)
+        self.actual_df = pd.read_csv(self.actual_file, dtype=str)
 
-# Create a key for each row in the expected and actual DataFrames
-def create_key(row):
-    return '-'.join([str(row[column]) for column in key_columns])
+    def create_key(self, row):
+        return '-'.join([str(row[column]) for column in self.key_columns])
 
-expected_df['key'] = expected_df.apply(create_key, axis=1)
-actual_df['key'] = actual_df.apply(create_key, axis=1)
+    def sort_dataframes(self):
+        self.expected_df['key'] = self.expected_df.apply(self.create_key, axis=1)
+        self.actual_df['key'] = self.actual_df.apply(self.create_key, axis=1)
+        self.expected_df = self.expected_df.sort_values(by='key')
+        self.actual_df = self.actual_df.sort_values(by='key')
 
-# Sort the data using the keys
-expected_df = expected_df.sort_values(by='key')
-actual_df = actual_df.sort_values(by='key')
+    def find_unique_keys(self):
+        self.unique_expected_keys = set(self.expected_df['key']).difference(self.actual_df['key'])
+        self.unique_actual_keys = set(self.actual_df['key']).difference(self.expected_df['key'])
 
-# Identify keys present only in expected or actual
-unique_expected_keys = set(expected_df['key']).difference(actual_df['key'])
-unique_actual_keys = set(actual_df['key']).difference(expected_df['key'])
+    def compare_rows(self, expected_row, actual_row):
+        comparison_dict = {'key': expected_row['key']}
 
-# Prepare the result of the comparison
-comparison_result = []
+        key = expected_row['key']
 
-# Rows with keys present in both expected and actual
-for key in expected_df['key']:
-    expected_rows = expected_df[expected_df['key'] == key]
-    actual_rows = actual_df[actual_df['key'] == key]
-    
-    print("--------acttual")
-    print(actual_rows)
-    print("-----------end")
-    expected_rows = expected_rows.fillna('')
-    actual_rows = actual_rows.fillna('')
+        if key in SPECIAL_KEY_COLUMNS:
+            self.handle_special_case(comparison_dict, key, expected_row, actual_row)
+        else:
+            self.compare_default(comparison_dict, expected_row, actual_row)
 
-    if not expected_rows.empty and not actual_rows.empty:
-        expected_row = expected_rows.iloc[0]
-        actual_row = actual_rows.iloc[0]
+        return comparison_dict
 
-        comparison_dict = {'key': key}
-        
-        for column in expected_df.columns:
+    def handle_special_case(self, comparison_dict, key, expected_row, actual_row):
+        if key == 'aqqq':
+            self.compare_length(comparison_dict, expected_row, actual_row)
+        elif key == 'rrrq':
+            self.compare_date_format(comparison_dict, expected_row, actual_row)
+        elif key == 'bbb':
+            self.compare_first_zone(comparison_dict, expected_row, actual_row)
+
+    def compare_length(self, comparison_dict, expected_row, actual_row):
+        for column in self.expected_df.columns:
             if column != 'key':
-                comparison_dict[f'expected_{column}'] = str(expected_row[column])
-                comparison_dict[f'actual_{column}'] = str(actual_row[column])
-                comparison_dict[f'result_{column}'] = "Pass" if str(expected_row[column]) == str(actual_row[column]) else "Fail"
-        
-        comparison_result.append(comparison_dict)
+                expected_value = str(expected_row[column])
+                actual_value = str(actual_row[column])
+                result = "Pass" if len(expected_value) == len(actual_value) else "Fail"
+                self.update_comparison_dict(comparison_dict, column, expected_value, actual_value, result)
 
-# Create a DataFrame from the comparison_result list
-comparison_df = pd.DataFrame(comparison_result)
+    def compare_date_format(self, comparison_dict, expected_row, actual_row):
+        date_columns = [column for column in self.expected_df.columns if 'date' in column]
+        for column in date_columns:
+            expected_value = str(expected_row[column])
+            actual_value = str(actual_row[column])
+            # Implement the is_date_format_valid function to check the date format
+            result = "Pass" if self.is_date_format_valid(expected_value) and self.is_date_format_valid(actual_value) else "Fail"
+            self.update_comparison_dict(comparison_dict, column, expected_value, actual_value, result)
 
-# Replace NaN with '' in comparison_df
-comparison_df = comparison_df.fillna('')
+    def compare_first_zone(self, comparison_dict, expected_row, actual_row):
+        first_zone_column = 'zone1'  # Change this to the actual column name for the first zone
+        expected_value = str(expected_row[first_zone_column])
+        actual_value = str(actual_row[first_zone_column])
+        result = "Pass" if expected_value == actual_value else "Fail"
+        self.update_comparison_dict(comparison_dict, first_zone_column, expected_value, actual_value, result)
 
-# Save the comparison result to a CSV file
-comparison_df.to_csv("comparison_result.csv", index=False)
+    def compare_default(self, comparison_dict, expected_row, actual_row):
+        for column in self.expected_df.columns:
+            if column != 'key':
+                expected_value = str(expected_row[column])
+                actual_value = str(actual_row[column])
+                result = "Pass" if expected_value == actual_value else "Fail"
+                self.update_comparison_dict(comparison_dict, column, expected_value, actual_value, result)
 
-# Separate DataFrames for keys only in expected or actual
-expected_only_df = expected_df[expected_df['key'].isin(unique_expected_keys)]
-actual_only_df = actual_df[actual_df['key'].isin(unique_actual_keys)]
-
-# Replace NaN with '' in expected_only_df
-expected_only_df = expected_only_df.fillna('')
-
-# Replace NaN with '' in actual_only_df
-actual_only_df = actual_only_df.fillna('')
-
-# Print the entire comparison result DataFrame
-print("Comparison Result:")
-print(comparison_df)
-
-# Print DataFrames with keys only in expected or actual
-print("\nKeys Only in Expected:--------------------------------------------")
-print(expected_only_df)
-
-print("\nKeys Only in Actual:------------------------------------------------------")
-print(actual_only_df)
+    def update_comparison_dict(self, comparison_dict, column, expected_value, actual_value, result):
+        comparison_dict[f'expected_{column}'] = expected_value
+        comparison_dict[f'actual_{column}'] = actual_value
+        comparison_dict[f'result_{column}'] = result
 
 
 
+    def compare_data(self):
+        self.load_data()
+        self.sort_dataframes()
+        self.find_unique_keys()
 
-ignore_columns = ['Magnitude', 'Series_title_21']
+        comparison_result = []
 
-# Update column names
-for column in comparison_df.columns:
-    for ignore_column in ignore_columns:
-        if f"result_{ignore_column}" in column:
-            new_column = column.replace(f"result_{ignore_column}", f"ignore_{ignore_column}")
-            comparison_df = comparison_df.rename(columns={column: new_column})
+        for key in self.expected_df['key']:
+            expected_rows = self.expected_df[self.expected_df['key'] == key]
+            actual_rows = self.actual_df[self.actual_df['key'] == key]
 
+            expected_rows = expected_rows.fillna('')
+            actual_rows = actual_rows.fillna('')
 
+            if not expected_rows.empty and not actual_rows.empty:
+                comparison_result.append(self.compare_rows(expected_rows.iloc[0], actual_rows.iloc[0]))
 
-def get_overall_status(row):
-    for col in row.index:
-        if col.startswith('result_') and row[col] == 'Fail':
-            return 'Fail'
-    return 'Pass'
+        self.comparison_df = pd.DataFrame(comparison_result)
+        self.comparison_df = self.comparison_df.fillna('')
 
-comparison_df['overall_status'] = comparison_df.apply(get_overall_status, axis=1)
+    def save_comparison_result(self, result_file):
+        self.comparison_df.to_csv(result_file, index=False)
+
+    def separate_dataframes(self):
+        expected_only_df = self.expected_df[self.expected_df['key'].isin(self.unique_expected_keys)]
+        actual_only_df = self.actual_df[self.actual_df['key'].isin(self.unique_actual_keys)]
+
+        expected_only_df = expected_only_df.fillna('')
+        actual_only_df = actual_only_df.fillna('')
+
+        return expected_only_df, actual_only_df
+
+    def print_comparison_result(self):
+        print("Comparison Result:")
+        print(self.comparison_df)
+
+    def print_dataframes(self):
+        expected_only_df, actual_only_df = self.separate_dataframes()
+        print("\nKeys Only in Expected:--------------------------------------------")
+        print(expected_only_df)
+        print("\nKeys Only in Actual:------------------------------------------------------")
+        print(actual_only_df)
+
+    def update_column_names(self):
+        for column in self.comparison_df.columns:
+            for ignore_column in self.ignore_columns:
+                if f"result_{ignore_column}" in column:
+                    new_column = column.replace(f"result_{ignore_column}", f"ignore_{ignore_column}")
+                    self.comparison_df = self.comparison_df.rename(columns={column: new_column})
+
+    def get_overall_status(self, row):
+        for col in row.index:
+            if col.startswith('result_') and row[col] == 'Fail':
+                return 'Fail'
+        return 'Pass'
+
+    def add_overall_status_column(self):
+        self.comparison_df['overall_status'] = self.comparison_df.apply(self.get_overall_status, axis=1)
+
+if __name__ == "__main__":
+    SPECIAL_KEY_COLUMNS = ['aqqq', 'rrrq', 'bbb']
+    comparer = DataComparer("expected.csv", "actual.csv")
+    comparer.compare_data()
+    comparer.update_column_names()
+    comparer.add_overall_status_column()
+    comparer.save_comparison_result("comparison_result.csv")
+    comparer.print_comparison_result()
+    comparer.print_dataframes()
