@@ -1,57 +1,91 @@
 import pandas as pd
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
 
-# Load the expected.csv and actual.csv files, treating all columns as strings
+# Load data from expected.csv and actual.csv files
 expected_df = pd.read_csv("expected.csv", dtype=str)
 actual_df = pd.read_csv("actual.csv", dtype=str)
 
-# Get the key header column names from the user
-key_columns = input("Enter the key column names separated by a comma: ").split(',')
+# Get the key header column names
+key_columns = ["Series_reference", "price", "Period", "Data_value"]
 
 # Create a key for each row in the expected and actual DataFrames
 def create_key(row):
-    return '-'.join(str(x) if x is not None else "" for x in row)
+    return '-'.join([str(row[column]) for column in key_columns])
 
-# Use both "Product" and "Price" as key columns
-key_columns = ["Product", "Price"]
-
-expected_df['key'] = expected_df[key_columns].apply(create_key, axis=1)
-actual_df['key'] = actual_df[key_columns].apply(create_key, axis=1)
-
-# Find keys and further columns present in expected.csv but not in actual.csv
-expected_columns = expected_df.columns.difference(actual_df.columns)
-
-# Find keys and further columns present in actual.csv but not in expected.csv
-actual_columns = actual_df.columns.difference(expected_df.columns)
-
-# Get common keys in actual.csv and expected.csv
-common_keys = set(expected_df['key']).intersection(actual_df['key'])
+expected_df['key'] = expected_df.apply(create_key, axis=1)
+actual_df['key'] = actual_df.apply(create_key, axis=1)
 
 # Sort the data using the keys
 expected_df = expected_df.sort_values(by='key')
 actual_df = actual_df.sort_values(by='key')
 
+# Identify keys present only in expected or actual
+unique_expected_keys = set(expected_df['key']).difference(actual_df['key'])
+unique_actual_keys = set(actual_df['key']).difference(expected_df['key'])
+
 # Prepare the result of the comparison
 comparison_result = []
 
-for key in common_keys:
-    expected_row = expected_df[expected_df['key'] == key]
-    actual_row = actual_df[actual_df['key'] == key]
+# Rows with keys present in both expected and actual
+for key in expected_df['key']:
+    expected_rows = expected_df[expected_df['key'] == key]
+    actual_rows = actual_df[actual_df['key'] == key]
+    
+    print("--------acttual")
+    print(actual_rows)
+    print("-----------end")
+    expected_rows = expected_rows.fillna('')
+    actual_rows = actual_rows.fillna('')
 
-    comparison_dict = {'key': key}
-    
-    for column in expected_columns:
-        comparison_dict[f'expected_{column}'] = expected_row.iloc[0][column]
-        comparison_dict[f'actual_{column}'] = actual_row.iloc[0][column]
-        comparison_dict[f'result_{column}'] = "Match" if expected_row.iloc[0][column] == actual_row.iloc[0][column] else "Mismatch"
-    
-    for column in actual_columns:
-        comparison_dict[f'actual_{column}'] = actual_row.iloc[0][column]
-        comparison_dict[f'result_{column}'] = "Match" if expected_row.iloc[0][column] == actual_row.iloc[0][column] else "Mismatch"
-    
-    comparison_result.append(comparison_dict)
+    if not expected_rows.empty and not actual_rows.empty:
+        expected_row = expected_rows.iloc[0]
+        actual_row = actual_rows.iloc[0]
+
+        comparison_dict = {'key': key}
+        
+        for column in expected_df.columns:
+            if column != 'key':
+                comparison_dict[f'expected_{column}'] = str(expected_row[column])
+                comparison_dict[f'actual_{column}'] = str(actual_row[column])
+                comparison_dict[f'result_{column}'] = "Pass" if str(expected_row[column]) == str(actual_row[column]) else "Fail"
+        
+        comparison_result.append(comparison_dict)
 
 # Create a DataFrame from the comparison_result list
 comparison_df = pd.DataFrame(comparison_result)
 
+# Replace NaN with '' in comparison_df
+comparison_df = comparison_df.fillna('')
+
 # Save the comparison result to a CSV file
 comparison_df.to_csv("comparison_result.csv", index=False)
+
+# Separate DataFrames for keys only in expected or actual
+expected_only_df = expected_df[expected_df['key'].isin(unique_expected_keys)]
+actual_only_df = actual_df[actual_df['key'].isin(unique_actual_keys)]
+
+# Replace NaN with '' in expected_only_df
+expected_only_df = expected_only_df.fillna('')
+
+# Replace NaN with '' in actual_only_df
+actual_only_df = actual_only_df.fillna('')
+
+# Print the entire comparison result DataFrame
+print("Comparison Result:")
+print(comparison_df)
+
+# Print DataFrames with keys only in expected or actual
+print("\nKeys Only in Expected:--------------------------------------------")
+print(expected_only_df)
+
+print("\nKeys Only in Actual:------------------------------------------------------")
+print(actual_only_df)
+
+def get_overall_status(row):
+    for col in row.index:
+        if col.startswith('result_') and row[col] == 'Fail':
+            return 'Fail'
+    return 'Pass'
+
+comparison_df['overall_status'] = comparison_df.apply(get_overall_status, axis=1)
