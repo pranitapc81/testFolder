@@ -1,8 +1,8 @@
 import pandas as pd
 
-# Load the expected.csv and actual.csv files
-expected_df = pd.read_csv("expected.csv")
-actual_df = pd.read_csv("actual.csv")
+# Load the expected.csv and actual.csv files, treating all columns as strings
+expected_df = pd.read_csv("expected.csv", dtype=str)
+actual_df = pd.read_csv("actual.csv", dtype=str)
 
 # Get the key header column names from the user
 key_columns = input("Enter the key column names separated by a comma: ").split(',')
@@ -10,6 +10,9 @@ key_columns = input("Enter the key column names separated by a comma: ").split('
 # Create a key for each row in the expected and actual DataFrames
 def create_key(row):
     return '-'.join(row)
+
+# Use both "Product" and "Price" as key columns
+key_columns = ["Product", "Price"]
 
 expected_df['key'] = expected_df[key_columns].apply(create_key, axis=1)
 actual_df['key'] = actual_df[key_columns].apply(create_key, axis=1)
