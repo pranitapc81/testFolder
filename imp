@@ -8,8 +8,11 @@ actual_df = pd.read_csv("actual.csv")
 key_columns = input("Enter the key column names separated by a comma: ").split(',')
 
 # Create a key for each row in the expected and actual DataFrames
-expected_df['key'] = expected_df[key_columns].apply(lambda row: '-'.join(row), axis=1)
-actual_df['key'] = actual_df[key_columns].apply(lambda row: '-'.join(row), axis=1)
+def create_key(row):
+    return '-'.join(row)
+
+expected_df['key'] = expected_df[key_columns].apply(create_key, axis=1)
+actual_df['key'] = actual_df[key_columns].apply(create_key, axis=1)
 
 # Find keys and further columns present in expected.csv but not in actual.csv
 expected_columns = expected_df.columns.difference(actual_df.columns)
