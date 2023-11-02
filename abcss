@@ -4,23 +4,28 @@ import pandas as pd
 # Load your CSV data
 csv_data = pd.read_csv('your_data.csv')
 
-# Create an empty DataFrame to store the expanded data
-expanded_data = pd.DataFrame()
-
 # Iterate through each row in the CSV data
 for index, row in csv_data.iterrows():
     key = row['key']
-    
-    # Iterate through the columns with 'expected_', 'actual_', and 'result_'
-    for col in csv_data.columns:
-        if col.startswith('expected_'):
-            field_name = col[len('expected_'):]
-            expected_value = row[col]
-            actual_value = row['actual_' + field_name]
-            result_value = row['result_' + field_name]
-            
-            # Add the data to the expanded_data DataFrame
-            expanded_data = expanded_data.append({'Field Name': field_name, 'Expected': expected_value, 'Actual': actual_value, 'Result': result_value}, ignore_index=True)
 
-# Display the expanded data as a table
-st.dataframe(expanded_data)
+    # Display the key as a title and allow expansion
+    with st.beta_expander(key):
+        # Create a header row
+        st.write("Field Name", "Expected", "Actual", "Result")
+
+        # Create an empty list to store data for the table
+        table_data = []
+
+        # Iterate through the columns with 'expected_', 'actual_', and 'result_'
+        for col in csv_data.columns:
+            if col.startswith('expected_'):
+                field_name = col[len('expected_'):]
+                expected_value = row[col]
+                actual_value = row['actual_' + field_name]
+                result_value = row['result_' + field_name]
+
+                # Append data to the table_data list
+                table_data.append([field_name, expected_value, actual_value, result_value])
+
+        # Display the table within the expandable section
+        st.table(table_data)
