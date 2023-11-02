@@ -82,6 +82,20 @@ print(expected_only_df)
 print("\nKeys Only in Actual:------------------------------------------------------")
 print(actual_only_df)
 
+
+
+
+ignore_columns = ['Magnitude', 'Series_title_21']
+
+# Update column names
+for column in comparison_df.columns:
+    for ignore_column in ignore_columns:
+        if f"result_{ignore_column}" in column:
+            new_column = column.replace(f"result_{ignore_column}", f"ignore_{ignore_column}")
+            comparison_df = comparison_df.rename(columns={column: new_column})
+
+
+
 def get_overall_status(row):
     for col in row.index:
         if col.startswith('result_') and row[col] == 'Fail':
