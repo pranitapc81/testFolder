@@ -1,0 +1,69 @@
+import streamlit as st
+import pandas as pd
+
+# Load your CSV data from the specified file path
+file_path = 'D:\\Rohan_hd\\pranita\\comparison_result.csv'
+csv_data = pd.read_csv(file_path)
+
+# Initialize selected_values outside of the sidebar
+selected_values = {}
+
+# Use st.sidebar for filters
+with st.sidebar:
+    # Create filters using Streamlit widgets
+    selected_fields = st.multiselect("Select Field(s) to Filter", csv_data.columns)
+
+    if selected_fields:
+        # Collect filter values for the selected fields
+        for field in selected_fields:
+            selected_values[field] = st.multiselect(f"Select values for '{field}'", csv_data[field].unique())
+
+# Filter the data based on selected values
+filter_condition = pd.Series(True, index=csv_data.index)
+
+for field, values in selected_values.items():
+    if values:
+        if field.endswith("_Period"):
+            filter_condition &= csv_data[field].apply(lambda x: x in values)
+        else:
+            filter_condition &= csv_data[field].isin(values)
+
+filtered_data = csv_data[filter_condition]
+
+# Display filtered data
+st.title("Data with Filters")
+st.dataframe(filtered_data)
+
+# Group data by key and overall_status
+grouped_data = filtered_data.groupby(['key', 'overall_status'])
+
+# Create a collapsible section for each key and overall_status
+for (key, overall_status), group in grouped_data:
+    with st.beta_expander(f"Key: {key}, Overall Status: {overall_status}"):
+        # Create a table to display the trios in a single row
+        trio_table = []
+
+        # Iterate through columns and create trios based on column names
+        for col in group.columns:
+            if col.startswith('expected_'):
+                field_name = col[len('expected_'):]
+
+                # Check if the columns are present in the data
+                expected_col = f'expected_{field_name}'
+                actual_col = f'actual_{field_name}'
+                result_col = f'result_{field_name}'
+                ignore_col = f'ignore_{field_name}'
+
+                if expected_col in group.columns and actual_col in group.columns and result_col in group.columns:
+                    expected_value = group.iloc[0][expected_col]
+                    actual_value = group.iloc[0][actual_col]
+                    result_value = group.iloc[0][result_col]
+                    trio_table.append([field_name, expected_value, actual_value, result_value])
+                elif expected_col in group.columns and actual_col in group.columns and ignore_col in group.columns:
+                    expected_value = group.iloc[0][expected_col]
+                    actual_value = group.iloc[0][actual_col]
+                    ignore_value = group.iloc[0][ignore_col]
+                    trio_table.append([field_name, expected_value, actual_value, ignore_value])
+
+        # Display the trio table
+        st.table(trio_table)
