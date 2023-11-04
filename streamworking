@@ -1,69 +1,89 @@
 import streamlit as st
 import pandas as pd
 
-# Load your CSV data from the specified file path
-file_path = 'D:\\Rohan_hd\\pranita\\comparison_result.csv'
-csv_data = pd.read_csv(file_path)
+class PyInsightsApp:
+    def __init__(self):
+        self.file_path = 'D:\\Rohan_hd\\pranita\\comparison_result.csv'
+        self.csv_data = self.load_data()
+        self.selected_values = {}
+        self.filter_condition = pd.Series(True, index=self.csv_data.index)
 
-# Initialize selected_values outside of the sidebar
-selected_values = {}
+    def load_data(self):
+        return pd.read_csv(self.file_path, keep_default_na=False)
 
-# Use st.sidebar for filters
-with st.sidebar:
-    # Create filters using Streamlit widgets
-    selected_fields = st.multiselect("Select Field(s) to Filter", csv_data.columns)
+    def sidebar(self):
+        with st.sidebar:
+            self.selected_fields = st.multiselect("Select Field(s) to Filter", self.csv_data.columns)
 
-    if selected_fields:
-        # Collect filter values for the selected fields
-        for field in selected_fields:
-            selected_values[field] = st.multiselect(f"Select values for '{field}'", csv_data[field].unique())
+            if self.selected_fields:
+                self.collect_selected_values()
 
-# Filter the data based on selected values
-filter_condition = pd.Series(True, index=csv_data.index)
+    def collect_selected_values(self):
+        for field in self.selected_fields:
+            self.selected_values[field] = st.multiselect(f"Select values for '{field}'", self.csv_data[field].unique())
 
-for field, values in selected_values.items():
-    if values:
-        if field.endswith("_Period"):
-            filter_condition &= csv_data[field].apply(lambda x: x in values)
-        else:
-            filter_condition &= csv_data[field].isin(values)
+    def apply_filters(self):
+        for field, values in self.selected_values.items():
+            if values:
+                if field.endswith("_Period"):
+                    self.filter_condition &= self.csv_data[field].apply(lambda x: x in values)
+                else:
+                    self.filter_condition &= self.csv_data[field].isin(values)
 
-filtered_data = csv_data[filter_condition]
+    def run(self):
+        st.set_page_config(page_title="Py_Insights", layout="wide")
+        self.sidebar()
+        self.apply_filters()
+        filtered_data = self.csv_data[self.filter_condition]
 
-# Display filtered data
-st.title("Data with Filters")
-st.dataframe(filtered_data)
+        st.title("Py Insights")
+        self.display_grouped_data(filtered_data)
 
-# Group data by key and overall_status
-grouped_data = filtered_data.groupby(['key', 'overall_status'])
+    def display_grouped_data(self, filtered_data):
+        grouped_data = filtered_data.groupby(['key', 'overall_status'])
 
-# Create a collapsible section for each key and overall_status
-for (key, overall_status), group in grouped_data:
-    with st.beta_expander(f"Key: {key}, Overall Status: {overall_status}"):
-        # Create a table to display the trios in a single row
+        for (key, overall_status), group in grouped_data:
+            self.display_collapsible_section(key, overall_status, group)
+
+    def display_collapsible_section(self, key, overall_status, group):
+        with st.expander(f"Key: {key}, Overall Status: {overall_status}"):
+            trio_table = self.create_trio_table(group)
+            st.write(trio_table, unsafe_allow_html=True)
+
+    def create_trio_table(self, group):
         trio_table = []
+        header_style = "background-color: #FAFAD2; border: 1px solid #000"
+        trio_table.append(["Field", "Expected", "Actual", "Expected", header_style])
 
-        # Iterate through columns and create trios based on column names
         for col in group.columns:
             if col.startswith('expected_'):
                 field_name = col[len('expected_'):]
-
-                # Check if the columns are present in the data
                 expected_col = f'expected_{field_name}'
                 actual_col = f'actual_{field_name}'
                 result_col = f'result_{field_name}'
                 ignore_col = f'ignore_{field_name}'
+                style = "border: 1px solid #000"
 
                 if expected_col in group.columns and actual_col in group.columns and result_col in group.columns:
                     expected_value = group.iloc[0][expected_col]
                     actual_value = group.iloc[0][actual_col]
                     result_value = group.iloc[0][result_col]
-                    trio_table.append([field_name, expected_value, actual_value, result_value])
+                    style = "background-color: #C9FDC2; border: 1px solid #000" if result_value == 'Pass' else "background-color: #F5C1C1; border: 1px solid #000"
+                    trio_table.append([field_name, expected_value, actual_value, result_value, style])
                 elif expected_col in group.columns and actual_col in group.columns and ignore_col in group.columns:
                     expected_value = group.iloc[0][expected_col]
                     actual_value = group.iloc[0][actual_col]
                     ignore_value = group.iloc[0][ignore_col]
-                    trio_table.append([field_name, expected_value, actual_value, ignore_value])
+                    trio_table.append([field_name, expected_value, actual_value, ignore_value, style])
 
-        # Display the trio table
-        st.table(trio_table)
+        trio_table_html = "<table style=\"width:100%; border: 1px solid #000\">"
+        for row in trio_table:
+            style = row[-1]
+            cells = [f"<td style='{style}'>{cell}</td>" for cell in row[:-1]]
+            trio_table_html += "<tr>" + "".join(cells) + "</tr>"
+        trio_table_html += "</table> <br>"
+        return trio_table_html
+
+if __name__ == "__main__":
+    app = PyInsightsApp()
+    app.run()
