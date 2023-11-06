@@ -1,0 +1,127 @@
+import streamlit as st
+import pandas as pd
+from jinja2 import Environment, FileSystemLoader
+import streamlit.components.v1 as components
+import pdfkit
+from fpdf import FPDF
+import base64
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+from reportlab.lib import colors
+import plotly.express as px
+import time
+
+
+class PyInsightsApp:
+    def __init__(self):
+        self.file_path = 'D:\\Rohan_hd\\pranita\\comparison_result.csv'
+        self.csv_data = self.load_data()
+        self.selected_values = {}
+        self.filter_condition = pd.Series(True, index=self.csv_data.index)
+
+    def load_data(self):
+        return pd.read_csv(self.file_path, keep_default_na=False)
+
+    def sidebar(self):
+        with st.sidebar:
+            self.selected_fields = st.multiselect("Select Field(s) to Filter", self.csv_data.columns)
+
+            if self.selected_fields:
+                self.collect_selected_values()
+
+    def collect_selected_values(self):
+        for field in self.selected_fields:
+            self.selected_values[field] = st.multiselect(f"Select values for '{field}'", self.csv_data[field].unique())
+
+    def apply_filters(self):
+        for field, values in self.selected_values.items():
+            if values:
+                if field.endswith("_Period"):
+                    self.filter_condition &= self.csv_data[field].apply(lambda x: x in values)
+                else:
+                    self.filter_condition &= self.csv_data[field].isin(values)
+
+    def run(self):
+        st.config.set_option('theme.base', 'dark')
+        st.set_page_config(page_title="Py_Insights", layout="wide")
+        self.sidebar()
+        self.apply_filters()
+        filtered_data = self.csv_data[self.filter_condition]
+
+        st.title("Py Insights")
+
+        export_as_html = st.button("Download Report")
+        if export_as_html:
+            output_html_path = 'filtered_data.html'
+            self.create_html(filtered_data)
+            self.show_message("Success", "The report is downloaded")
+
+        self.display_grouped_data(filtered_data)
+
+    def create_html(self, filtered_data):
+        html_table = filtered_data.to_html(classes='table', index=False)
+        # Save the HTML to a file
+        with open('output.html', 'w') as html_file:
+            html_file.write(html_table)
+
+    def display_grouped_data(self, filtered_data):
+        grouped_data = filtered_data.groupby(['key', 'overall_status'])
+        for (key, overall_status), group in grouped_data:
+            self.display_collapsible_section(key, overall_status, group)
+
+    def display_collapsible_section(self, key, overall_status, group):
+        with st.expander(f"Key: {key},Overall Status: {overall_status}"):
+            trio_table = self.create_trio_table(group)
+            st.write(trio_table, unsafe_allow_html=True)
+
+    def create_trio_table(self, group):
+        trio_table = []
+
+        for col in group.columns:
+            if col.startswith('expected_'):
+                field_name = col[len('expected_'):]
+                expected_col = f'expected_{field_name}'
+                actual_col = f'actual_{field_name}'
+                result_col = f'result_{field_name}'
+                ignore_col = f'ignore_{field_name}'
+
+                if expected_col in group.columns and actual_col in group.columns and result_col in group.columns:
+                    expected_value = group.iloc[0][expected_col]
+                    actual_value = group.iloc[0][actual_col]
+                    result_value = group.iloc[0][result_col]
+                    style = "background-color: #003311; border: 1px solid whitesmoke" if result_value == 'Pass' else "background-color: #800000; border: 1px solid whitesmoke"
+                    trio_table.append([field_name, expected_value, actual_value, result_value, style])
+                elif expected_col in group.columns and actual_col in group.columns and ignore_col in group.columns:
+                    style = "border: 1px solid whitesmoke"
+                    expected_value = group.iloc[0][expected_col]
+                    actual_value = group.iloc[0][actual_col]
+                    ignore_value = group.iloc[0][ignore_col]
+                    trio_table.append([field_name, expected_value, actual_value, ignore_value, style])
+
+        trio_table_html = self.render_template("template.html", {
+            "header_style": "background-color: #262730; border: 1px solid whitesmoke",
+            "trio_table": trio_table
+        })
+        return trio_table_html
+
+    def render_template(self, template_name, context):
+        env = Environment(loader=FileSystemLoader("."))
+        template = env.get_template(template_name)
+        return template.render(context)
+
+    def remove_success():
+        success_container.empty()
+
+    def show_message(self, flag, message):
+        message_container = st.empty()
+        if flag == 'Success':
+            message_container.success("Success! " + message)
+        else:
+            message_container.error("Error! " + message)
+        time.sleep(2)
+        message_container.empty()
+
+
+if __name__ == "__main__":
+    app = PyInsightsApp()
+    app.run()
