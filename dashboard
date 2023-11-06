@@ -1,0 +1,56 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+# from bokeh.plotting import figure, show
+import matplotlib.pyplot as plt
+# import streamlit_aggrid as ag
+
+st.set_page_config(
+    page_title="Dashboard",
+    page_icon="👋",
+)
+
+st.write("# Welcome to Py Insights! 👋")
+
+
+st.markdown(
+    """
+    ddd
+"""
+)
+
+file_path = 'D:\\Rohan_hd\\pranita\\comparison_result.csv'
+# df = pd.read_csv(file_path)
+
+
+
+
+
+
+# Read the CSV file into a DataFrame
+df = pd.read_csv(file_path)  # Replace 'your_file.csv' with the actual file path
+status_counts = df['overall_status'].value_counts()
+# Calculate the number of keys with each status
+custom_colors = ['#E44E1F', '#3E7B91']  # Replace with your preferred colors
+
+# Create a pie chart with custom colors and dark theme
+fig, ax = plt.subplots()
+ax.pie(status_counts, labels=status_counts.index, autopct='%1.1f%%', startangle=140, colors=custom_colors)
+ax.set_title("Pass/Fail Status Distribution")
+
+# Set a dark background for the plot
+ax.set_facecolor('#1E1E1E')  # Replace with your preferred background color
+
+# Display the pie chart using Streamlit
+st.pyplot(fig)
+
+
+
+
+import streamlit_aggrid as ag
+
+# Create a data grid
+ag_grid = ag.AgGrid(data, editable=True)
+
+# Display the data grid in Streamlit
+st.write(ag_grid)
