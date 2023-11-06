@@ -1,0 +1,18 @@
+<!-- template.html -->
+<table style="width:100%; border: 1px solid whitesmoke; text-align: center;">
+  <tr style="font-size:20px">
+    <th style="{{ header_style }}">Field</th>
+    <th style="{{ header_style }}">Expected</th>
+    <th style="{{ header_style }}">Actual</th>
+    <th style="{{ header_style }}">Result</th>
+  </tr>
+  {% for row in trio_table %}
+  <tr>
+    <td style="{{ row[4] }}">{{ row[0] }}</td>
+    <td style="{{ row[4] }}">{{ row[1] }}</td>
+    <td style="{{ row[4] }}">{{ row[2] }}</td>
+    <td style="{{ row[4] }}">{{ row[3] }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<br>
