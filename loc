@@ -1,0 +1,32 @@
+import argparse
+import pandas as pd
+
+class DataComparer:
+    def __init__(self, expected_file, actual_file):
+        self.expected_file = expected_file
+        self.actual_file = actual_file
+        # ... (the rest of your class remains the same)
+
+if __name__ == "__main__":
+    SPECIAL_KEY_COLUMNS = ['aqqq', 'rrrq', 'bbb']
+
+    # Create an argument parser
+    parser = argparse.ArgumentParser(description='Compare data in two CSV files.')
+    
+    # Add expected and actual file path arguments
+    parser.add_argument('expected_file', type=str, help='Path to the expected CSV file')
+    parser.add_argument('actual_file', type=str, help='Path to the actual CSV file')
+    
+    # Parse the command-line arguments
+    args = parser.parse_args()
+    
+    # Create the DataComparer instance with the provided file paths
+    comparer = DataComparer(args.expected_file, args.actual_file)
+    
+    # The rest of your script remains the same
+    comparer.compare_data()
+    comparer.update_column_names()
+    comparer.add_overall_status_column()
+    comparer.save_comparison_result("comparison_result.csv")
+    comparer.print_comparison_result()
+    comparer.print_dataframes()
