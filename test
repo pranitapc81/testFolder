@@ -1,0 +1,73 @@
+import unittest
+import pandas as pd
+from io import StringIO
+from your_script_name import DataComparer, SPECIAL_KEY_COLUMNS
+
+class TestDataComparer(unittest.TestCase):
+    def setUp(self):
+        # Create sample data for testing
+        expected_data = "Series_reference,price,Period,Data_value\nA,10,202101,100\nB,20,202102,200\n"
+        actual_data = "Series_reference,price,Period,Data_value\nA,10,202101,110\nB,20,202102,220\n"
+        
+        self.expected_csv = StringIO(expected_data)
+        self.actual_csv = StringIO(actual_data)
+
+        # Initialize DataComparer with sample data
+        self.comparer = DataComparer(self.expected_csv, self.actual_csv)
+
+    def test_load_data(self):
+        # Test if data is loaded correctly
+        self.comparer.load_data()
+        self.assertIsInstance(self.comparer.expected_df, pd.DataFrame)
+        self.assertIsInstance(self.comparer.actual_df, pd.DataFrame)
+
+    def test_sort_dataframes(self):
+        # Test if dataframes are sorted correctly
+        self.comparer.load_data()
+        self.comparer.sort_dataframes()
+        self.assertTrue((self.comparer.expected_df['key'] == ['A-10-202101-100', 'B-20-202102-200']).all())
+        self.assertTrue((self.comparer.actual_df['key'] == ['A-10-202101-110', 'B-20-202102-220']).all())
+
+    def test_find_unique_keys(self):
+        # Test if unique keys are identified correctly
+        self.comparer.load_data()
+        self.comparer.sort_dataframes()
+        self.comparer.find_unique_keys()
+        self.assertEqual(self.comparer.unique_expected_keys, set())
+        self.assertEqual(self.comparer.unique_actual_keys, set())
+
+    def test_compare_rows_default(self):
+        # Test compare_rows method for default case
+        self.comparer.load_data()
+        self.comparer.sort_dataframes()
+        key = 'A-10-202101-100'
+        expected_row = self.comparer.expected_df[self.comparer.expected_df['key'] == key].iloc[0]
+        actual_row = self.comparer.actual_df[self.comparer.actual_df['key'] == key].iloc[0]
+        comparison_result = self.comparer.compare_rows(expected_row, actual_row)
+
+        # Expected values are the same, so all results should be "Pass"
+        for column in self.comparer.expected_df.columns:
+            if column != 'key':
+                self.assertEqual(comparison_result[f'result_{column}'], 'Pass')
+
+    def test_compare_rows_special_case(self):
+        # Test compare_rows method for a special case
+        self.comparer.load_data()
+        self.comparer.sort_dataframes()
+        key = 'aqqq'
+        expected_row = self.comparer.expected_df[self.comparer.expected_df['key'] == key].iloc[0]
+        actual_row = self.comparer.actual_df[self.comparer.actual_df['key'] == key].iloc[0]
+        comparison_result = self.comparer.compare_rows(expected_row, actual_row)
+
+        # Since it's a special case, the lengths should be compared
+        for column in self.comparer.expected_df.columns:
+            if column != 'key':
+                expected_value = str(expected_row[column])
+                actual_value = str(actual_row[column])
+                result = "Pass" if len(expected_value) == len(actual_value) else "Fail"
+                self.assertEqual(comparison_result[f'result_{column}'], result)
+
+    # Add more tests for other methods as needed
+
+if __name__ == '__main__':
+    unittest.main()
