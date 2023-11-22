@@ -1,0 +1,73 @@
+import pandas as pd
+import json
+
+class ExcelRuleApplier:
+    def __init__(self, excel_file_path, rules_config_path, output_excel_path):
+        self.excel_file_path = excel_file_path
+        self.rules_config_path = rules_config_path
+        self.output_excel_path = output_excel_path
+        self.sheets = None
+        self.rules = None
+
+    def load_excel_data(self):
+        self.sheets = pd.read_excel(self.excel_file_path, sheet_name=None)
+
+    def load_rules(self):
+        with open(self.rules_config_path) as f:
+            config = json.load(f)
+            self.rules = config.get("rules", [])
+
+    def apply_rules(self, row, column_rules, sheets):
+        for rule in column_rules:
+            conditions = rule.get("conditions", [])
+            default_value = rule.get("default_value", None)
+            target_sheet = rule.get("sheet", None)
+
+            if target_sheet is None or target_sheet not in sheets:
+                continue
+
+            sheet_data = sheets[target_sheet]
+
+            for condition in conditions:
+                sheet_condition, column_conditions = condition["condition"].split(" and ", 1)
+
+                if eval(sheet_condition, globals(), {**row.to_dict(), 'inputSheet': target_sheet}):
+                    individual_conditions = column_conditions.split(" or ")
+                    if any(eval(cond, globals(), row.to_dict()) for cond in individual_conditions):
+                        return condition["value"]
+
+            return default_value
+
+    def apply_rules_to_dataframe(self, df, sheet_name):
+        for rule in self.rules:
+            column_name = rule.get("column")
+            conditions = rule.get("conditions", [])
+
+            if column_name not in df:
+                df[column_name] = df.apply(lambda row: self.apply_rules(row, [rule], self.sheets), axis=1)
+
+    def process_excel_data(self):
+        for sheet_name, df in self.sheets.items():
+            self.apply_rules_to_dataframe(df, sheet_name)
+
+    def save_result_to_excel(self):
+        with pd.ExcelWriter(self.output_excel_path) as writer:
+            for sheet_name, df in self.sheets.items():
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+if __name__ == "__main__":
+    excel_rule_applier = ExcelRuleApplier(
+        excel_file_path='input.xlsx',
+        rules_config_path='rules_config.json',
+        output_excel_path='output.xlsx'
+    )
+
+    excel_rule_applier.load_excel_data()
+    excel_rule_applier.load_rules()
+    excel_rule_applier.process_excel_data()
+    excel_rule_applier.save_result_to_excel()
+
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.max_rows', None)
+    a = pd.read_excel("output.xlsx")
+    print(a)
