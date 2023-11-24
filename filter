@@ -10,9 +10,6 @@ class ExcelSheetFilter:
         sheet_dict = {}
 
         for sheet in xls.sheet_names:
-            if sheet in sheets_to_delete:
-                continue  # Skip the sheet if it's in the delete list
-
             df = xls.parse(sheet)
             
             if sheet.endswith('Event'):
@@ -33,6 +30,16 @@ class ExcelSheetFilter:
                         sheet_dict[filter_sheet_name].drop(columns=['Output Reference_result'], inplace=True)
 
             sheet_dict[sheet] = df
+
+        # Delete specified sheets
+        for sheet_to_delete in sheets_to_delete:
+            if sheet_to_delete in sheet_dict:
+                del sheet_dict[sheet_to_delete]
+
+        # Delete specified columns
+        for sheet_name, df in sheet_dict.items():
+            if columns_to_delete:
+                sheet_dict[sheet_name] = df.drop(columns=columns_to_delete)
 
         with pd.ExcelWriter(self.output_file, engine='xlsxwriter') as writer:
             for sheet, df in sheet_dict.items():
