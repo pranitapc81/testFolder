@@ -1,55 +1,57 @@
 import pandas as pd
 
-class ExcelSheetFilter:
+class ExcelProcessor:
     def __init__(self, input_file, output_file):
         self.input_file = input_file
         self.output_file = output_file
+        self.results_sheet_name = 'Results'
+        self.scenarios_sheet_name = 'Scenarios'
+        self.event_sheet_suffix = 'EVENT'
 
-    def filter_sheets(self, columns_to_delete=None, sheets_to_delete=None):
-        xls = pd.ExcelFile(self.input_file)
-        sheet_dict = {}
+    def read_sheet(self, sheet_name):
+        return pd.read_excel(self.input_file, sheet_name=sheet_name)
 
-        for sheet in xls.sheet_names:
-            df = xls.parse(sheet)
-            
-            if sheet.endswith('Event'):
-                df = df[df['Output Type'] == 'EXPECTED']
-                if columns_to_delete:
-                    df = df.drop(columns=columns_to_delete)
+    def add_step_order(self, results_df):
+        step_order = 1
+        prev_test_case_ref = None
+        results_df['Step Order'] = 0
 
-            if sheet == 'Result':
-                result_df = self.add_step_order(df)
-                # Extract relevant columns from Result sheet
-                relevant_columns = ['Output Reference', 'Test Case Reference', 'Step Description', 'Step Order']
-                # Add columns to sheets ending with 'Event'
-                for filter_sheet_name in xls.sheet_names:
-                    if filter_sheet_name.endswith('Event') and filter_sheet_name in sheet_dict:
-                        merge_suffix = '_result'  # Add a suffix to avoid column conflicts
-                        result_df_subset = result_df[relevant_columns].add_suffix(merge_suffix)
-                        sheet_dict[filter_sheet_name] = pd.merge(sheet_dict[filter_sheet_name], result_df_subset, left_on='Output Reference', right_on='Output Reference_result', how='left')
-                        sheet_dict[filter_sheet_name].drop(columns=['Output Reference_result'], inplace=True)
+        for index, row in results_df.iterrows():
+            current_test_case_ref = row['Test Case Reference']
+            current_step_description = row['Step Description']
 
-            sheet_dict[sheet] = df
+            if current_test_case_ref != prev_test_case_ref or current_step_description != results_df.at[index - 1, 'Step Description']:
+                step_order = 1
 
-        # Delete specified sheets
-        for sheet_to_delete in sheets_to_delete:
-            if sheet_to_delete in sheet_dict:
-                del sheet_dict[sheet_to_delete]
+            results_df.at[index, 'Step Order'] = step_order
+            step_order += 1
+            prev_test_case_ref = current_test_case_ref
 
-        # Delete specified columns
-        for sheet_name, df in sheet_dict.items():
-            if columns_to_delete:
-                sheet_dict[sheet_name] = df.drop(columns=columns_to_delete)
+        return results_df
 
-        with pd.ExcelWriter(self.output_file, engine='xlsxwriter') as writer:
-            for sheet, df in sheet_dict.items():
-                df.to_excel(writer, sheet_name=sheet, index=False)
+    def copy_data_to_event(self, results_df, event_df):
+        event_df['Step Description'] = event_df['Output Reference'].map(results_df.set_index('Output Reference')['Step Description'])
+        event_df['Step Order'] = event_df['Output Reference'].map(results_df.set_index('Output Reference')['Step Order'])
+        event_df['Test Case Reference'] = event_df['Output Reference'].map(results_df.set_index('Output Reference')['Test Case Reference'])
+        return event_df
+
+    def process_results_sheet(self):
+        results_df = self.read_sheet(self.results_sheet_name)
+        results_df = self.add_step_order(results_df)
+        results_df.to_excel(self.output_file, sheet_name=self.results_sheet_name, index=False)
+
+    def process_event_sheets(self):
+        for sheet_name in results_df.filter(regex=f'{self.event_sheet_suffix}$').columns:
+            event_df = self.read_sheet(sheet_name)
+            event_df = self.copy_data_to_event(results_df, event_df)
+            event_df.to_excel(self.output_file, sheet_name=sheet_name, index=False)
+
+    def process_excel(self):
+        self.process_results_sheet()
+        self.process_event_sheets()
 
 # Example usage:
-input_file = 'path/to/your/input/file.xlsx'
-output_file = 'path/to/your/output/new_file.xlsx'
-columns_to_delete = ['Column1', 'Column2']  # Replace with the actual column names to delete
-sheets_to_delete = ['Sheet3', 'Sheet4']  # Replace with the actual sheet names to delete
-
-excel_filter = ExcelSheetFilter(input_file, output_file)
-excel_filter.filter_sheets(columns_to_delete=columns_to_delete, sheets_to_delete=sheets_to_delete)
+input_file = 'your_excel_file.xlsx'
+output_file = 'your_output_file.xlsx'
+processor = ExcelProcessor(input_file, output_file)
+processor.process_excel()
