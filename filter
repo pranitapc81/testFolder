@@ -1,0 +1,31 @@
+import pandas as pd
+
+def filter_rows(input_file, output_file, sheet_name):
+    # Read the Excel file
+    xls = pd.ExcelFile(input_file)
+
+    # Dictionary to store DataFrames for each sheet
+    sheet_dict = {}
+
+    # Iterate through all sheets
+    for sheet in xls.sheet_names:
+        # Read each sheet into a DataFrame
+        df = xls.parse(sheet)
+        
+        # Filter rows based on the condition only for the specified sheet
+        if sheet == sheet_name:
+            df = df[df['Output Type'] == 'EXPECTED']
+        
+        # Store the DataFrame in the dictionary
+        sheet_dict[sheet] = df
+
+    # Write the DataFrames to a new Excel file
+    with pd.ExcelWriter(output_file, engine='xlsxwriter') as writer:
+        for sheet, df in sheet_dict.items():
+            df.to_excel(writer, sheet_name=sheet, index=False)
+
+# Example usage:
+input_file = 'path/to/your/input/file.xlsx'
+output_file = 'path/to/your/output/new_file.xlsx'
+sheet_name = 'Sheet1'  # Replace with the actual sheet name
+filter_rows(input_file, output_file, sheet_name)
