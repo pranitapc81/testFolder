@@ -1,0 +1,41 @@
+import pandas as pd
+
+class ExcelUpdater:
+    def __init__(self, workbook_path, output_path):
+        self.workbook_path = workbook_path
+        self.output_path = output_path
+        self.results_df = pd.read_excel(workbook_path, sheet_name='Results')
+
+    def update_event_sheets(self, event_df):
+        event_df['Test Case Reference'] = ""
+        event_df['Step Description'] = ""
+        event_df['Step Order'] = ""
+
+        for index, row in event_df.iterrows():
+            order_reference = row['Order Reference']
+            matching_row = self.results_df[(self.results_df['Order Reference'] == order_reference)]
+
+            if not matching_row.empty:
+                event_df.at[index, 'Test Case Reference'] = matching_row['Test Case Reference'].values[0]
+                event_df.at[index, 'Step Description'] = matching_row['Step Description'].values[0]
+                event_df.at[index, 'Step Order'] = matching_row['Step Order'].values[0]
+
+        return event_df
+
+    def process_workbook(self):
+        with pd.ExcelWriter(self.output_path, engine='xlsxwriter') as writer:
+            for sheet_name in pd.ExcelFile(self.workbook_path).sheet_names:
+                if sheet_name.endswith('EVENT'):
+                    event_df = pd.read_excel(self.workbook_path, sheet_name=sheet_name)
+                    updated_event_df = self.update_event_sheets(event_df)
+                    updated_event_df.to_excel(writer, sheet_name=f'Updated_{sheet_name}', index=False)
+
+        print("Task completed successfully. Updated sheets saved in:", self.output_path)
+
+# Example usage:
+if __name__ == "__main__":
+    workbook_path = 'path/to/your/workbook.xlsx'
+    output_path = 'path/to/your/output/workbook_updated.xlsx'
+
+    excel_updater = ExcelUpdater(workbook_path, output_path)
+    excel_updater.process_workbook()
