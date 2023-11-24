@@ -5,16 +5,33 @@ class ExcelSheetFilter:
         self.input_file = input_file
         self.output_file = output_file
 
-    def filter_sheet(self, sheet_name):
+    def filter_sheets(self, sheet_names_to_filter, columns_to_delete=None, sheets_to_delete=None):
         xls = pd.ExcelFile(self.input_file)
         sheet_dict = {}
 
         for sheet in xls.sheet_names:
+            if sheet in sheets_to_delete:
+                continue  # Skip the sheet if it's in the delete list
+
             df = xls.parse(sheet)
             
-            if sheet == sheet_name:
+            if sheet in sheet_names_to_filter:
                 df = df[df['Output Type'] == 'EXPECTED']
-            
+                if columns_to_delete:
+                    df = df.drop(columns=columns_to_delete)
+
+            if sheet == 'Result':
+                result_df = self.add_step_order(df)
+                # Extract relevant columns from Result sheet
+                relevant_columns = ['Output Reference', 'Test Case Reference', 'Step Description', 'Step Order']
+                # Add columns to other sheets based on 'Output Reference'
+                for filter_sheet_name in sheet_names_to_filter:
+                    if filter_sheet_name in sheet_dict:
+                        merge_suffix = '_result'  # Add a suffix to avoid column conflicts
+                        result_df_subset = result_df[relevant_columns].add_suffix(merge_suffix)
+                        sheet_dict[filter_sheet_name] = pd.merge(sheet_dict[filter_sheet_name], result_df_subset, left_on='Output Reference', right_on='Output Reference_result', how='left')
+                        sheet_dict[filter_sheet_name].drop(columns=['Output Reference_result'], inplace=True)
+
             sheet_dict[sheet] = df
 
         with pd.ExcelWriter(self.output_file, engine='xlsxwriter') as writer:
@@ -24,7 +41,9 @@ class ExcelSheetFilter:
 # Example usage:
 input_file = 'path/to/your/input/file.xlsx'
 output_file = 'path/to/your/output/new_file.xlsx'
-sheet_name = 'Sheet1'
+sheet_names_to_filter = ['Sheet1', 'Sheet2', 'Result']  # Replace with the actual sheet names to filter
+columns_to_delete = ['Column1', 'Column2']  # Replace with the actual column names to delete
+sheets_to_delete = ['Sheet3', 'Sheet4']  # Replace with the actual sheet names to delete
 
 excel_filter = ExcelSheetFilter(input_file, output_file)
-excel_filter.filter_sheet(sheet_name)
+excel_filter.filter_sheets(sheet_names_to_filter, columns_to_delete, sheets_to_delete)
