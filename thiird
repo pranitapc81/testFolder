@@ -1,0 +1,33 @@
+import pandas as pd
+
+def filter_and_delete_columns(input_file, output_file, expected_value, columns_to_delete):
+    # Create a new Excel writer
+    writer = pd.ExcelWriter(output_file, engine='xlsxwriter')
+
+    # Read the Excel file into a pandas DataFrame
+    xls = pd.ExcelFile(input_file)
+
+    # Iterate through all sheets in the original Excel file
+    for sheet_name in xls.sheet_names:
+        # Read the sheet into a DataFrame
+        df = pd.read_excel(input_file, sheet_name)
+
+        # Filter rows based on the 'Output Type' column
+        df = df[df['Output Type'] == expected_value]
+
+        # Delete specified columns
+        df = df.drop(columns=columns_to_delete, errors='ignore')
+
+        # Write the filtered and modified DataFrame to the new Excel file
+        df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+    # Close the Excel writer
+    writer.close()
+
+# Example usage
+input_file = 'aa.xlsx'
+output_file = 'aa1.xlsx'
+expected_value = 'EXPECTED'
+columns_to_delete = ['Column1', 'Column2', 'Column3']  # Add the columns you want to delete
+
+filter_and_delete_columns(input_file, output_file, expected_value, columns_to_delete)
