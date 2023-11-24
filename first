@@ -1,0 +1,54 @@
+import pandas as pd
+import pandas as pd
+import pandas as pd
+
+
+class ExcelProcessor:
+    def __init__(self, file_path):
+        self.file_path = file_path
+        self.original_workbook = pd.ExcelFile(file_path)
+        self.df = self.original_workbook.parse('Results')
+
+    def add_step_order_column(self):
+        self.df['Step Order'] = 0
+        current_test_case = ''
+        step_order = 1
+
+        for index, row in self.df.iterrows():
+            if row['Test Case Reference'] == current_test_case:
+                if row['Step Description'] == self.df.at[index - 1, 'Step Description']:
+                    self.df.at[index, 'Step Order'] = self.df.at[index - 1, 'Step Order']
+                else:
+                    step_order += 1
+                    self.df.at[index, 'Step Order'] = step_order
+            else:
+                current_test_case = row['Test Case Reference']
+                step_order = 1
+                self.df.at[index, 'Step Order'] = step_order
+
+    def create_updated_workbook(self, new_file_path):
+        # Create a new Excel writer with XlsxWriter engine
+        with pd.ExcelWriter(new_file_path, engine='xlsxwriter') as writer:
+
+            # Copy sheets from the original workbook to the new workbook
+            for sheet_name in self.original_workbook.sheet_names:
+                if sheet_name != 'Results':
+                    original_sheet = self.original_workbook.parse(sheet_name)
+                    original_sheet.to_excel(writer, sheet_name=sheet_name, index=False)
+
+            # Add the updated 'Results' sheet
+            self.df.to_excel(writer, sheet_name='Results', index=False)
+
+        print("Updated workbook created successfully. New file:", new_file_path)
+
+
+# Example usage
+file_path = 'Book1.xlsx'
+new_file_path = 'Updated_Book1.xlsx'
+
+processor = ExcelProcessor(file_path)
+processor.add_step_order_column()
+processor.create_updated_workbook(new_file_path)
+
+a = pd.read_excel(new_file_path, 'Results')
+print(a)
