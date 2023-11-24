@@ -7,43 +7,48 @@ class ExcelProcessor:
         self.results_sheet_name = 'Results'
         self.scenarios_sheet_name = 'Scenarios'
         self.event_sheet_suffix = 'EVENT'
+        self.results_df = None
 
     def read_sheet(self, sheet_name):
         return pd.read_excel(self.input_file, sheet_name=sheet_name)
 
-    def add_step_order(self, results_df):
+    def add_step_order(self):
         step_order = 1
         prev_test_case_ref = None
-        results_df['Step Order'] = 0
+        self.results_df['Step Order'] = 0
 
-        for index, row in results_df.iterrows():
+        for index, row in self.results_df.iterrows():
             current_test_case_ref = row['Test Case Reference']
             current_step_description = row['Step Description']
 
-            if current_test_case_ref != prev_test_case_ref or current_step_description != results_df.at[index - 1, 'Step Description']:
+            if current_test_case_ref != prev_test_case_ref or current_step_description != self.results_df.at[index - 1, 'Step Description']:
                 step_order = 1
 
-            results_df.at[index, 'Step Order'] = step_order
+            self.results_df.at[index, 'Step Order'] = step_order
             step_order += 1
             prev_test_case_ref = current_test_case_ref
 
-        return results_df
+    def copy_data_to_event(self, event_df):
+        merged_df = pd.merge(event_df, self.results_df[['Test Case Reference', 'Output Reference', 'Step Description', 'Step Order']],
+                             how='left', left_on='Output Reference', right_on='Output Reference')
+        merged_df = merged_df.rename(columns={'Step Description': 'Event Step Description', 'Step Order': 'Event Step Order', 'Test Case Reference': 'Event Test Case Reference'})
+        return merged_df
 
-    def copy_data_to_event(self, results_df, event_df):
-        event_df['Step Description'] = event_df['Output Reference'].map(results_df.set_index('Output Reference')['Step Description'])
-        event_df['Step Order'] = event_df['Output Reference'].map(results_df.set_index('Output Reference')['Step Order'])
-        event_df['Test Case Reference'] = event_df['Output Reference'].map(results_df.set_index('Output Reference')['Test Case Reference'])
+    def trim_output_type(self, event_df):
+        event_df['Output Type'] = event_df['Output Type'].str.strip()
+        event_df = event_df[event_df['Output Type'] == 'EXPECTED']
         return event_df
 
     def process_results_sheet(self):
-        results_df = self.read_sheet(self.results_sheet_name)
-        results_df = self.add_step_order(results_df)
-        results_df.to_excel(self.output_file, sheet_name=self.results_sheet_name, index=False)
+        self.results_df = self.read_sheet(self.results_sheet_name)
+        self.add_step_order()
+        self.results_df.to_excel(self.output_file, sheet_name=self.results_sheet_name, index=False)
 
     def process_event_sheets(self):
-        for sheet_name in results_df.filter(regex=f'{self.event_sheet_suffix}$').columns:
+        for sheet_name in self.results_df.filter(regex=f'{self.event_sheet_suffix}$').columns:
             event_df = self.read_sheet(sheet_name)
-            event_df = self.copy_data_to_event(results_df, event_df)
+            event_df = self.copy_data_to_event(event_df)
+            event_df = self.trim_output_type(event_df)
             event_df.to_excel(self.output_file, sheet_name=sheet_name, index=False)
 
     def process_excel(self):
