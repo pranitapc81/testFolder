@@ -45,11 +45,13 @@ class ExcelProcessor:
         self.results_df.to_excel(self.output_file, sheet_name=self.results_sheet_name, index=False)
 
     def process_event_sheets(self):
-        for sheet_name in self.results_df.filter(regex=f'{self.event_sheet_suffix}$').columns:
-            event_df = self.read_sheet(sheet_name)
-            event_df = self.copy_data_to_event(event_df)
-            event_df = self.trim_output_type(event_df)
-            event_df.to_excel(self.output_file, sheet_name=sheet_name, index=False)
+        with pd.ExcelWriter(self.output_file, engine='openpyxl') as writer:
+            writer.book = pd.load_workbook(self.output_file)
+            for sheet_name in self.results_df.filter(regex=f'{self.event_sheet_suffix}$').columns:
+                event_df = self.read_sheet(sheet_name)
+                event_df = self.copy_data_to_event(event_df)
+                event_df = self.trim_output_type(event_df)
+                event_df.to_excel(writer, sheet_name=sheet_name, index=False)
 
     def process_excel(self):
         self.process_results_sheet()
