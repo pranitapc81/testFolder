@@ -1,0 +1,47 @@
+import pandas as pd
+
+class ExcelHeaderUpdater:
+    def __init__(self, mapping_file_path, target_file_path):
+        self.mapping_file_path = mapping_file_path
+        self.target_file_path = target_file_path
+
+    def load_mapping_file(self):
+        return pd.read_excel(self.mapping_file_path)
+
+    def load_target_file(self):
+        return pd.read_excel(self.target_file_path)
+
+    def display_dataframe(self, df, title):
+        print(f"\n{title} DataFrame:")
+        print(df)
+
+    def update_headers(self):
+        # Load the mapping Excel file
+        mapping_df = self.load_mapping_file()
+
+        # Load the target Excel file
+        target_df = self.load_target_file()
+
+        # Display the original target dataframe
+        self.display_dataframe(target_df, "Original Target")
+
+        # Create a dictionary to map old headers to new headers
+        header_mapping = dict(zip(mapping_df['Current Header'], mapping_df['New Header']))
+
+        # Rename columns in the target dataframe
+        target_df.rename(columns=header_mapping, inplace=True)
+
+        # Display the updated target dataframe
+        self.display_dataframe(target_df, "Updated Target")
+
+        # Save the updated dataframe back to the target Excel file
+        target_df.to_excel(self.target_file_path, index=False)
+        print("\nUpdated Target Excel File Saved.")
+
+# Example usage
+if __name__ == "__main__":
+    mapping_path = 'path/to/mapping.xlsx'
+    target_path = 'path/to/target.xlsx'
+
+    excel_updater = ExcelHeaderUpdater(mapping_path, target_path)
+    excel_updater.update_headers()
