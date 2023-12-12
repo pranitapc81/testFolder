@@ -1,0 +1,43 @@
+import xml.etree.ElementTree as ET
+
+def add_or_update_xml(xml_file, xpath, new_value):
+    tree = ET.parse(xml_file)
+    root = tree.getroot()
+
+    # Clean namespaces before making any changes
+    ET.clean_namespaces(root)
+
+    # Split the XPath into individual elements
+    elements = xpath.split('/')
+
+    # Iterate through each element in the XPath
+    current_element = root
+    for element in elements[:-1]:
+        # Check if the element exists, otherwise create it
+        child = current_element.find(element)
+        if child is None:
+            new_element = ET.Element(element)
+            current_element.append(new_element)
+            current_element = new_element
+        else:
+            current_element = child
+
+    # Create or update the final element in the XPath
+    final_element = elements[-1]
+    existing_element = current_element.find(final_element)
+
+    if existing_element is not None:
+        existing_element.text = str(new_value)
+    else:
+        new_element = ET.Element(final_element)
+        new_element.text = str(new_value)
+        current_element.append(new_element)
+
+    tree.write(xml_file)
+
+# Example usage:
+xml_file_path = 'example.xml'
+xpath_to_add = 'root/parent/nested/new_element/abc'
+new_value_to_add = 'Hello, Deep World!'
+
+add_or_update_xml(xml_file_path, xpath_to_add, new_value_to_add)
