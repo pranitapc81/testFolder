@@ -1,43 +1,70 @@
 import xml.etree.ElementTree as ET
 
-def add_or_update_xml(xml_file, xpath, new_value):
-    tree = ET.parse(xml_file)
-    root = tree.getroot()
+def add_or_update_xml(xml_string, xpath, new_value):
+    try:
+        # Parse the XML string
+        root = ET.fromstring(xml_string)
 
-    # Clean namespaces before making any changes
-    ET.clean_namespaces(root)
+        # Clean namespaces before making any changes
+        ET.clean_namespaces(root)
 
-    # Split the XPath into individual elements
-    elements = xpath.split('/')
+        # Split the XPath into individual elements
+        elements = xpath.split('/')
 
-    # Iterate through each element in the XPath
-    current_element = root
-    for element in elements[:-1]:
-        # Check if the element exists, otherwise create it
-        child = current_element.find(element)
-        if child is None:
-            new_element = ET.Element(element)
-            current_element.append(new_element)
-            current_element = new_element
+        # Iterate through each element in the XPath
+        current_element = root
+        for element in elements[:-1]:
+            # Check if the element exists, otherwise create it
+            child = current_element.find(element)
+            if child is None:
+                new_element = ET.Element(element)
+                current_element.append(new_element)
+                current_element = new_element
+            else:
+                current_element = child
+
+        # Create or update the final element in the XPath
+        final_element = elements[-1]
+        existing_element = current_element.find(final_element)
+
+        if existing_element is not None:
+            existing_element.text = str(new_value)
         else:
-            current_element = child
+            new_element = ET.Element(final_element)
+            new_element.text = str(new_value)
+            current_element.append(new_element)
 
-    # Create or update the final element in the XPath
-    final_element = elements[-1]
-    existing_element = current_element.find(final_element)
+        # Serialize the modified XML to a string
+        updated_xml_string = ET.tostring(root, encoding='utf-8').decode('utf-8')
+        
+        return updated_xml_string
 
-    if existing_element is not None:
-        existing_element.text = str(new_value)
-    else:
-        new_element = ET.Element(final_element)
-        new_element.text = str(new_value)
-        current_element.append(new_element)
-
-    tree.write(xml_file)
+    except ET.ParseError as e:
+        print(f"Error parsing XML: {e}")
+        return None
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
 
 # Example usage:
-xml_file_path = 'example.xml'
+xml_input = '''
+<root>
+    <parent>
+        <nested>
+            <new_element>
+                <existing_element>Old Value</existing_element>
+            </new_element>
+        </nested>
+    </parent>
+</root>
+'''
+
 xpath_to_add = 'root/parent/nested/new_element/abc'
 new_value_to_add = 'Hello, Deep World!'
 
-add_or_update_xml(xml_file_path, xpath_to_add, new_value_to_add)
+updated_xml = add_or_update_xml(xml_input, xpath_to_add, new_value_to_add)
+
+if updated_xml is not None:
+    print(updated_xml)
+else:
+    print("Failed to update XML.")
