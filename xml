@@ -2,13 +2,16 @@ from lxml import etree
 
 def add_or_update_xml(xml_string, xpath, new_value):
     try:
+        # Clean up the XPath by removing leading and trailing slashes
+        xpath = xpath.strip('/')
+
         # Parse the XML string using lxml
         root = etree.fromstring(xml_string)
 
         # Clean namespaces before making any changes
         etree.cleanup_namespaces(root)
 
-        # Split the XPath into individual elements
+        # Split the cleaned-up XPath into individual elements
         elements = xpath.split('/')
 
         # Iterate through each element in the XPath
@@ -34,8 +37,8 @@ def add_or_update_xml(xml_string, xpath, new_value):
             new_element.text = str(new_value)
             current_element.append(new_element)
 
-        # Serialize the modified XML to a string
-        updated_xml_string = etree.tostring(root, encoding='utf-8').decode('utf-8')
+        # Serialize the modified XML to a string without the XML declaration
+        updated_xml_string = etree.tostring(root, encoding='utf-8', xml_declaration=False).decode('utf-8')
         
         return updated_xml_string
 
@@ -59,7 +62,7 @@ xml_input = '''
 </root>
 '''
 
-xpath_to_add = 'root/parent/nested/new_element/abc'
+xpath_to_add = '/root/parent/nested/new_element/abc/'
 new_value_to_add = 'Hello, Deep World!'
 
 updated_xml = add_or_update_xml(xml_input, xpath_to_add, new_value_to_add)
