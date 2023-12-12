@@ -1,12 +1,12 @@
-import xml.etree.ElementTree as ET
+from lxml import etree
 
 def add_or_update_xml(xml_string, xpath, new_value):
     try:
-        # Parse the XML string
-        root = ET.fromstring(xml_string)
+        # Parse the XML string using lxml
+        root = etree.fromstring(xml_string)
 
         # Clean namespaces before making any changes
-        ET.clean_namespaces(root)
+        etree.cleanup_namespaces(root)
 
         # Split the XPath into individual elements
         elements = xpath.split('/')
@@ -17,7 +17,7 @@ def add_or_update_xml(xml_string, xpath, new_value):
             # Check if the element exists, otherwise create it
             child = current_element.find(element)
             if child is None:
-                new_element = ET.Element(element)
+                new_element = etree.Element(element)
                 current_element.append(new_element)
                 current_element = new_element
             else:
@@ -30,16 +30,16 @@ def add_or_update_xml(xml_string, xpath, new_value):
         if existing_element is not None:
             existing_element.text = str(new_value)
         else:
-            new_element = ET.Element(final_element)
+            new_element = etree.Element(final_element)
             new_element.text = str(new_value)
             current_element.append(new_element)
 
         # Serialize the modified XML to a string
-        updated_xml_string = ET.tostring(root, encoding='utf-8').decode('utf-8')
+        updated_xml_string = etree.tostring(root, encoding='utf-8').decode('utf-8')
         
         return updated_xml_string
 
-    except ET.ParseError as e:
+    except etree.XMLSyntaxError as e:
         print(f"Error parsing XML: {e}")
         return None
     except Exception as e:
