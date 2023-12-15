@@ -1,0 +1,30 @@
+project_root/
+|-- config/
+|   |-- stubbing_sheet_config.yaml
+|   |-- reflow_db_config.yaml
+|   |-- asset_class_mapping.yaml
+|   |-- queue_mapping.yaml
+|-- src/
+|   |-- main.py
+|   |-- stubbing_tool/
+|       |-- __init__.py
+|       |-- stubbing_service.py
+|       |-- reflow_db_service.py
+|       |-- queue_service.py
+|       |-- email_service.py
+|       |-- utils/
+|           |-- __init__.py
+|           |-- logging_utils.py
+|-- tests/
+|   |-- test_stubbing_service.py
+|   |-- test_reflow_db_service.py
+|   |-- test_queue_service.py
+|   |-- test_email_service.py
+|-- requirements.txt
+|-- Dockerfile
+|-- .gitignore
+|-- alembic/
+|   |-- versions/
+|       |-- __init__.py
+|-- .env.sample
+|-- .travis.yml
