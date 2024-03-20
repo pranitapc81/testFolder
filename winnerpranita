@@ -1,0 +1,203 @@
+import random
+import string
+from datetime import datetime, timedelta
+import pytz
+import re
+import pandas as pd
+from openpyxl import Workbook
+
+import rstr
+
+class TradeProcessor:
+    def __init__(self, workbook):
+        self.workbook = workbook
+        self.trades_df = pd.read_excel(self.workbook, sheet_name='Trades')
+        self.rules_df = pd.read_excel(self.workbook, sheet_name='Rules')
+        self.common_fields_df = pd.read_excel(self.workbook, sheet_name='Common_Fields')
+        self.resolved_rules = {}
+        self.resolved_rules_for_trades = {}
+
+    def apply_common_fields(self):
+        common_fields_applier = CommonFieldsApplier(self.trades_df, self.common_fields_df)
+        return common_fields_applier.apply()
+
+    def resolve_rules(self):
+        trades_with_common_fields_df = self.apply_common_fields()
+        resolver = RuleResolver(self.rules_df, trades_with_common_fields_df)
+        return resolver.resolve()
+
+    def update_generated_trade_id(self, result_df):
+        rule_resolver = RuleResolver(self.rules_df, result_df)
+        id_updater = GeneratedTradeIDUpdater(self.trades_df, result_df, rule_resolver)
+        return id_updater.update()
+
+    def run(self):
+        trades_with_common_fields_df = self.resolve_rules()
+        trades_with_updated_generated_trade_id_df = self.update_generated_trade_id(trades_with_common_fields_df)
+        return trades_with_updated_generated_trade_id_df
+
+class CommonFieldsApplier:
+    def __init__(self, trades_df, common_fields_df):
+        self.trades_df = trades_df
+        self.common_fields_df = common_fields_df
+
+    def apply(self):
+        result_df = pd.DataFrame(columns=['TradeID', 'Path', 'Value', 'ApplyRule', 'IsTradeID', 'GeneratedTradeID'])
+
+        for trade_id, group in self.trades_df.groupby('TradeID'):
+            common_fields = self.common_fields_df.copy()
+            common_fields['TradeID'] = trade_id
+
+            if not group.empty:
+                result_df = pd.concat([result_df, common_fields, group], ignore_index=True)
+            else:
+                result_df = pd.concat([result_df, common_fields], ignore_index=True)
+
+        result_df['ApplyRule'] = result_df['ApplyRule'].astype('Int64')
+
+        return result_df
+
+class RuleResolver:
+    def __init__(self, rules_df, trades_with_common_fields_df):
+        self.rules_df = rules_df
+        self.trades_with_common_fields_df = trades_with_common_fields_df
+        self.resolved_rules_for_trades = {}
+
+    def resolve(self):
+        for index, row in self.trades_with_common_fields_df.iterrows():
+            rule_id = row['ApplyRule']
+            if pd.notna(rule_id):
+                if row['TradeID'] not in self.resolved_rules_for_trades:
+                    self.resolved_rules_for_trades[row['TradeID']] = {}
+                if rule_id not in self.resolved_rules_for_trades[row['TradeID']]:
+                    rule = self.rules_df[self.rules_df['RuleID'] == rule_id].iloc[0]
+                    rule_value = self.resolve_rule(rule)
+                    self.resolved_rules_for_trades[row['TradeID']][rule_id] = rule_value
+                else:
+                    rule_value = self.resolved_rules_for_trades[row['TradeID']][rule_id]
+                self.trades_with_common_fields_df.at[index, 'Value'] = rule_value
+
+        return self.trades_with_common_fields_df
+
+    def resolve_rule(self, rule):
+        rule_length = int(rule['Length'])
+        rule_type = rule['Type']
+        rule_pattern = rule['Pattern']
+
+        if rule_type == 'DateTime':
+            return self.resolve_datetime_rule(rule_length, rule_pattern)
+        elif rule_type == 'Date':
+            return self.resolve_date_rule(rule_length, rule_pattern)
+        elif rule_type == 'Custom':
+            return self.resolve_custom_rule(rule_pattern)
+        else:
+            return self.resolve_other_rules(rule_type, rule_length)
+
+    def resolve_datetime_rule(self, rule_length, rule_pattern):
+        now = datetime.now(pytz.utc)
+        if rule_length is None or rule_length == 0:
+            return now.strftime(rule_pattern)
+        elif rule_length > 0:
+            future_datetime = now + timedelta(seconds=rule_length)
+            return future_datetime.strftime(rule_pattern)
+        elif rule_length < 0:
+            past_datetime = now - timedelta(seconds=abs(rule_length))
+            return past_datetime.strftime(rule_pattern)
+
+    def resolve_date_rule(self, rule_length, rule_pattern):
+        today = datetime.today()
+        if rule_length is None or rule_length == 0:
+            return today.strftime(rule_pattern)
+        elif rule_length > 0:
+            future_date = today + timedelta(days=rule_length)
+            return future_date.strftime(rule_pattern)
+        elif rule_length < 0:
+            past_date = today - timedelta(days=abs(rule_length))
+            return past_date.strftime(rule_pattern)
+
+    def resolve_custom_rule(self, rule_pattern):
+        return self.generate_custom_value(rule_pattern)
+
+    def resolve_other_rules(self, rule_type, rule_length):
+        switch = {
+            'Numeric': lambda: ''.join(random.choices(string.digits, k=rule_length)),
+            'AlphaNumeric': lambda: ''.join(random.choices(string.ascii_letters + string.digits, k=rule_length)),
+            'Alpha': lambda: ''.join(random.choices(string.ascii_letters, k=rule_length)),
+            'Custom': lambda: "CustomValue"
+        }
+        return switch.get(rule_type, lambda: "UnknownRuleType")()
+
+    def generate_custom_value(self, pattern):
+        for _ in range(1000):
+            value = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            if re.fullmatch(pattern, value):
+                return value
+        return "Unable to generate a valid value"
+
+class GeneratedTradeIDUpdater:
+    def __init__(self, trades_df, result_df, rule_resolver):
+        self.trades_df = trades_df
+        self.result_df = result_df
+        self.rule_resolver = rule_resolver
+        self.resolved_rules = {}
+
+    def update(self):
+        unique_trade_ids = self.result_df['TradeID'].unique()
+        for trade_id in unique_trade_ids:
+            if trade_id not in self.resolved_rules:
+                self.resolved_rules[trade_id] = self.resolve_rule_for_trade(trade_id)
+
+        trade_id_map = {}
+        for trade_id in self.result_df['TradeID'].unique():
+            y_value_row = self.result_df[(self.result_df['TradeID'] == trade_id) & (self.result_df['IsTradeID'] == 'Y')]
+            if not y_value_row.empty:
+                generated_trade_id_value = y_value_row.iloc[0]['Value']
+                trade_id_map[trade_id] = generated_trade_id_value
+
+        self.result_df['GeneratedTradeID'] = self.result_df['TradeID'].map(trade_id_map)
+        return self.result_df
+
+    def resolve_rule_for_trade(self, trade_id):
+        trade_rows = self.trades_df[self.trades_df['TradeID'] == trade_id]  # Corrected to trades_df
+        resolved_rule = {}
+        resolved_rule_ids = set()
+        for index, row in trade_rows.iterrows():
+            rule_id = row['ApplyRule']
+            if pd.notna(rule_id) and rule_id not in resolved_rule_ids:
+                rule = self.rule_resolver.rules_df[self.rule_resolver.rules_df['RuleID'] == rule_id].iloc[0]  # Corrected to rules_df
+                rule_value = self.rule_resolver.resolve_rule(rule)
+                resolved_rule[rule_id] = rule_value
+                resolved_rule_ids.add(rule_id)
+        return resolved_rule
+
+    # Other methods remain the same...
+
+class ExcelWriter:
+    def __init__(self, filepath="output.xlsx"):
+        self.filepath = filepath
+        self.workbook = Workbook()
+
+    def add_df_to_workbook(self, df, sheet_name="Result"):
+
+        with pd.ExcelWriter(self.filepath, engine='openpyxl', if_sheet_exists='replace', mode='a') as writer:
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+        print('DataFrames are written to Excel File successfully.')
+
+        return self.filepath
+
+
+if __name__ == "__main__":
+    input_file_path = r'your_workbook.xlsx'
+    processor = TradeProcessor(input_file_path)
+    result_df = processor.run()
+    rule_resolver = RuleResolver(processor.rules_df, result_df)
+    id_updater = GeneratedTradeIDUpdater(processor.trades_df, result_df, rule_resolver)
+    updated_df = id_updater.update()
+
+    # Create an instance of ExcelWriter
+    excel_writer = ExcelWriter(filepath=input_file_path)
+    excel_writer.add_df_to_workbook(updated_df, sheet_name="Result")
+
+    pd.set_option("display.max_rows", None)
+    pd.set_option("display.max_columns", None)
+    print(updated_df)
