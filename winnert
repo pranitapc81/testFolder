@@ -1,0 +1,44 @@
+import unittest
+from unittest.mock import patch
+import pandas as pd
+
+from test3.yes import TradeProcessor
+
+
+class TestTradeProcessor(unittest.TestCase):
+
+    @patch('pandas.read_excel')
+    def test_apply_common_fields(self, mock_read_excel):
+        # Dummy data for Excel sheets
+        trades_data = {'TradeID': [1, 2], 'Field1': ['Data1', 'Data3'], 'Field2': ['Data2', 'Data4'], 'ApplyRule': [1, 2]}
+        common_fields_data = {'TradeID': [1, 1], 'Path': ['Field1', 'Field2'], 'Value': ['CommonValue1', 'CommonValue2']}
+        rules_data = {'RuleID': [1, 2], 'Type': ['DateTime', 'Numeric'], 'Length': [3600, 6], 'Pattern': ['%Y-%m-%d %H:%M:%S', r'\d{6}']}
+
+        # Mock the pandas read_excel function to return predefined DataFrame
+        mock_read_excel.side_effect = lambda *args, **kwargs: {
+            'Trades': pd.DataFrame(trades_data),
+            'Common_Fields': pd.DataFrame(common_fields_data),
+            'Rules': pd.DataFrame(rules_data)
+        }[kwargs['sheet_name']]
+
+        # Create TradeProcessor instance
+        processor = TradeProcessor('mock_file.xlsx')
+
+        # Test apply_common_fields method
+        result_df = processor.apply_common_fields()
+
+        # Expected result DataFrame after applying common fields
+        expected_result_df = pd.DataFrame({
+            'TradeID': [1, 1, 2, 2],
+            'Path': ['Field1', 'Field2', 'Field1', 'Field2'],
+            'Value': ['CommonValue1', 'CommonValue2', 'CommonValue1', 'CommonValue2'],
+            'ApplyRule': [None, None, None, None],
+            'IsTradeID': [None, None, None, None],
+            'GeneratedTradeID': [None, None, None, None]
+        })
+
+        # Assert that the result DataFrame matches the expected result
+        pd.testing.assert_frame_equal(result_df, expected_result_df)
+
+if __name__ == '__main__':
+    unittest.main()
