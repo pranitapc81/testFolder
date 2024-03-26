@@ -1,14 +1,68 @@
+import pandas as pd
+import json
 from datetime import datetime
 
-def get_current_datetime_formatted_microseconds():
-    # Get the current datetime
-    now = datetime.now()
-    
-    # Format the datetime to include year, month, day, hour, minute, second, and microseconds
-    formatted_datetime = now.strftime("%y%m%d%H%M%S%f")
-    
-    return formatted_datetime
+# Read Excel data into DataFrame (replace 'your_excel_file.xlsx' with your file path)
+df = pd.read_excel("your_excel_file.xlsx")
 
-# Example usage
-formatted_datetime = get_current_datetime_formatted_microseconds()
-print(formatted_datetime)
+# Helper function to generate a scenario ID
+def get_scenario_id():
+    return 'sc_' + datetime.now().strftime('%Y%m%dT%H%M%S')
+
+# Function to extract trio field details for each row
+def extract_trio_details(row, scenario_id):
+    details = []
+    for col in row.index:
+        if 'Actual_' in col:
+            field_name = col.split('Actual_')[-1]
+            actual_value = row[col]
+            expected_col = 'Expected_' + field_name
+            expected_value = row[expected_col] if expected_col in row.index else None
+            result_col = 'Result_' + field_name
+            field_status = row[result_col] if result_col in row.index else None
+            details.append({
+                'ScenarioID': scenario_id,
+                'FieldName': field_name,
+                'ActualValue': actual_value,
+                'ExpectedValue': expected_value,
+                'FieldStatus': field_status
+            })
+    return details
+
+# Function to process each row for the first JSON output
+def process_row(row):
+    scenario_id = get_scenario_id()  # Generate scenario_id for each row
+    pass_count = sum(row[col] == 'Pass' for col in row.index if 'Result_' in col)
+    fail_count = sum(row[col] == 'Fail' for col in row.index if 'Result_' in col)
+    ignore_count = sum(row[col] == 'Ignore' for col in row.index if 'Ignore_' in col)
+
+    return {
+        'TestcaseID': row.name,
+        'ScenarioID': scenario_id,
+        'PassCount': pass_count,
+        'FailCount': fail_count,
+        'IgnoreCount': ignore_count
+    }
+
+# Generate scenario ID (same for all rows if you run this once per dataset)
+scenario_id = get_scenario_id()
+
+# Extract trio details for all rows
+all_trio_details = []
+for index, row in df.iterrows():
+    all_trio_details.extend(extract_trio_details(row, scenario_id))
+
+# Apply function to each row for the first JSON output and store results in a list
+results = df.apply(process_row, axis=1)
+
+# Convert list of dictionaries to JSON for the first output
+json_result_1 = json.dumps(list(results), indent=4)
+
+# Convert list of dictionaries to JSON for the second output
+json_result_2 = json.dumps(all_trio_details, indent=4)
+
+# Print both JSON outputs
+print("JSON Output 1:")
+print(json_result_1)
+print("\nJSON Output 2:")
+print(json_result_2)
