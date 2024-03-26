@@ -1,26 +1,14 @@
-import pandas as pd
-import json
+from datetime import datetime
 
-# Read Excel data into DataFrame
-df = pd.read_excel("your_excel_file.xlsx")
+def get_current_datetime_formatted_microseconds():
+    # Get the current datetime
+    now = datetime.now()
+    
+    # Format the datetime to include year, month, day, hour, minute, second, and microseconds
+    formatted_datetime = now.strftime("%y%m%d%H%M%S%f")
+    
+    return formatted_datetime
 
-# Function to process each row
-def process_row(row):
-    testcase_id = row['Expected_aa']
-    pass_count = sum(row[col] == 'Pass' for col in row.index if 'Result_' in col)
-    fail_count = sum(row[col] == 'Fail' for col in row.index if 'Result_' in col)
-    ignore_count = sum(row[col] == 'Ignore' for col in row.index if 'Ignore_' in col)
-
-    return {
-        'TestcaseID': testcase_id,
-        'PassCount': pass_count,
-        'FailCount': fail_count,
-        'IgnoreCount': ignore_count
-    }
-
-# Apply function to each row and store results in a list
-results = df.apply(process_row, axis=1)
-
-# Convert list of dictionaries to JSON
-json_result = json.dumps(list(results), indent=4)
-print(json_result)
+# Example usage
+formatted_datetime = get_current_datetime_formatted_microseconds()
+print(formatted_datetime)
