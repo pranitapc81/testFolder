@@ -1,0 +1,39 @@
+import pandas as pd
+import json
+
+# Sample DataFrame
+data = {
+    'Key': ['Key1', 'Key2', 'Key3'],
+    'Overall_status': ['Pass', 'Fail', 'Pass'],
+    'Expected_TESTCASEID': ['TC001', 'TC002', 'TC003'],
+    'actual_field1': ['A', 'B', 'C'],
+    'expected_field1': ['A', 'B', 'C'],
+    'result_field1': ['Pass', 'Fail', 'Pass'],
+    'actual_field2': ['D', 'E', 'F'],
+    'expected_field2': ['D', 'E', 'F'],
+    'result_field2': ['Fail', 'Fail', 'Pass'],
+    'ignore_field2': ['Yes', 'No', 'No']
+}
+
+df = pd.DataFrame(data)
+
+# Function to process each row
+def process_row(row):
+    testcase_id = row['Expected_TESTCASEID']
+    pass_count = sum(row[f'result_field{i}'] == 'Pass' for i in range(1, len(row) // 3 + 1))
+    fail_count = sum(row[f'result_field{i}'] == 'Fail' for i in range(1, len(row) // 3 + 1))
+    ignore_count = sum('ignore_field' in row and row[f'ignore_field{i}'] == 'Yes' for i in range(1, len(row) // 3 + 1))
+    
+    return {
+        'TestcaseID': testcase_id,
+        'PassCount': pass_count,
+        'FailCount': fail_count,
+        'IgnoreCount': ignore_count
+    }
+
+# Apply function to each row and store results in a list
+results = df.apply(process_row, axis=1)
+
+# Convert list of dictionaries to JSON
+json_result = json.dumps(list(results), indent=4)
+print(json_result)
