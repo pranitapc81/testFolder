@@ -1,44 +1,29 @@
 import json
-import requests
 
 def split_json(data, chunk_size):
     """Split JSON data into chunks."""
+    # Remove the outer brackets []
+    data = data[1:-1]
+    
+    # Convert the string into a list of dictionaries
+    json_data = json.loads(data)
+    
     chunks = []
-    for i in range(0, len(data), chunk_size):
-        chunks.append(data[i:i + chunk_size])
+    current_chunk = []
+    for node in json_data:
+        if len(current_chunk) < chunk_size:
+            current_chunk.append(node)
+        else:
+            chunks.append(current_chunk)
+            current_chunk = [node]
+    
+    # Add brackets [] to each chunk
+    chunks = [json.dumps(chunk) for chunk in chunks]
+    
     return chunks
 
-def send_chunks_to_endpoint(chunks, endpoint):
-    """Send each chunk to the specified endpoint."""
-    for chunk in chunks:
-        try:
-            response = requests.post(endpoint, json=chunk)
-            print("Response:", response.status_code, response.text)
-        except Exception as e:
-            print("Error:", e)
-
-def process_json_chunks():
-    # Your JSON data (example)
-    json_data = [
-        {"id": 1, "name": "John"},
-        {"id": 2, "name": "Alice"},
-        {"id": 3, "name": "Bob"},
-        {"id": 4, "name": "Jane"},
-        {"id": 5, "name": "Eve"}
-        # More data...
-    ]
-
-    # Set the chunk size as per your requirement
-    chunk_size = 2  # Adjust this value as needed
-
-    # Split JSON data into chunks
-    json_chunks = split_json(json_data, chunk_size)
-
-    # Specify your endpoint
-    endpoint = 'http://your-endpoint-url.com'
-
-    # Send each chunk to the endpoint
-    send_chunks_to_endpoint(json_chunks, endpoint)
-
-if __name__ == "__main__":
-    process_json_chunks()
+# Example usage:
+data = '[{"id": 1, "name": "John"}, {"id": 2, "name": "Alice"}, {"id": 3, "name": "Bob"}, {"id": 4, "name": "Jane"}, {"id": 5, "name": "Eve"}]'
+chunk_size = 2
+chunks = split_json(data, chunk_size)
+print(chunks)
