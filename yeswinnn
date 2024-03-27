@@ -9,10 +9,12 @@ def get_scenario_id():
     # Generates a unique scenario ID based on the current datetime
     return 'sc_' + datetime.now().strftime('%Y%m%d%H%M%S%f')
 
-# Function to extract trio field details for each row, generating unique scenario IDs
-def extract_trio_details(row):
-    scenario_id = get_scenario_id()  # Unique for each row
-    details = []
+# Function to process each row for both JSON outputs
+def process_row(row):
+    scenario_id = get_scenario_id()  # Generate unique scenario_id per row
+    details = []  # To store details for JSON 2
+    pass_count = fail_count = ignore_count = 0
+
     for col in row.index:
         if 'Actual_' in col:
             field_base = col.split('Actual_')[1]
@@ -20,48 +22,49 @@ def extract_trio_details(row):
             result_col = f'Result_{field_base}'
             ignore_col = f'Ignore_{field_base}'
 
-            # Determine the status of the field (Result or Ignore)
-            if result_col in row.index and pd.notna(row[result_col]):
-                field_status = row[result_col]
-            elif ignore_col in row.index and pd.notna(row[ignore_col]):
-                field_status = 'Ignore'
-            else:
-                field_status = None  # Adjust based on data or requirements
-            
+            actual_value = row[col]
+            expected_value = row.get(expected_col, None)
+            result_status = row.get(result_col, None)
+            ignore_status = row.get(ignore_col, None)
+
+            if result_status == 'Pass':
+                pass_count += 1
+            elif result_status == 'Fail':
+                fail_count += 1
+            if pd.notna(ignore_status):
+                ignore_count += 1
+
             details.append({
                 'ScenarioID': scenario_id,
                 'FieldName': field_base,
-                'ActualValue': row[col],
-                'ExpectedValue': row[expected_col] if expected_col in row.index else None,
-                'FieldStatus': field_status
+                'ActualValue': actual_value,
+                'ExpectedValue': expected_value,
+                'FieldStatus': result_status if pd.notna(result_status) else 'Ignore'
             })
-    return details
 
-# Process each row for the summary JSON output
-def process_summary(row):
-    scenario_id = get_scenario_id()  # Unique for each row
-    pass_count = sum(row[col] == 'Pass' for col in row.index if 'Result_' in col)
-    fail_count = sum(row[col] == 'Fail' for col in row.index if 'Result_' in col)
-    ignore_count = sum(1 for col in row.index if 'Ignore_' in col and pd.notna(row[col]))
-
-    return {
+    summary = {
         'TestcaseID': row.name,
         'ScenarioID': scenario_id,
         'PassCount': pass_count,
         'FailCount': fail_count,
         'IgnoreCount': ignore_count
     }
+    return summary, details
 
-# Applying the functions
-df_details = df.apply(lambda row: extract_trio_details(row), axis=1)
-summary_results = df.apply(lambda row: process_summary(row), axis=1)
+# Applying the process_row function to each row
+summaries = []
+all_details = []
+for index, row in df.iterrows():
+    summary, details = process_row(row)
+    summaries.append(summary)
+    all_details.extend(details)
 
 # Convert results to JSON
-json_details = json.dumps(list(df_details.sum()), indent=4)  # .sum() is used to flatten the list of lists
-json_summary = json.dumps(list(summary_results), indent=4)
+json_summary = json.dumps(summaries, indent=4)
+json_details = json.dumps(all_details, indent=4)
 
 # Print or save the JSON outputs
-print("Detailed JSON Output:")
-print(json_details)
-print("\nSummary JSON Output:")
+print("Summary JSON Output:")
 print(json_summary)
+print("\nDetailed JSON Output:")
+print(json_details)
