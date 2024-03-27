@@ -1,70 +1,46 @@
-import pandas as pd
 import json
-from datetime import datetime
+import requests
 
-# Assuming df is your DataFrame read from the Excel file
+def split_json(data, chunk_size):
+    """Split JSON data into chunks."""
+    chunks = []
+    for i in range(0, len(data), chunk_size):
+        chunks.append(data[i:i + chunk_size])
+    return chunks
 
-# Helper function to generate a scenario ID
-def get_scenario_id():
-    # Generates a unique scenario ID based on the current datetime
-    return 'sc_' + datetime.now().strftime('%Y%m%d%H%M%S%f')
+def send_chunks_to_endpoint(chunks, endpoint):
+    """Send each chunk to the specified endpoint."""
+    for chunk in chunks:
+        try:
+            response = requests.post(endpoint, json=chunk)
+            print("Response:", response.status_code, response.text)
+        except Exception as e:
+            print("Error:", e)
 
-# Function to process each row for both JSON outputs
-def process_row(row):
-    scenario_id = get_scenario_id()  # Generate unique scenario_id per row
-    details = []  # To store details for JSON 2
-    pass_count = fail_count = ignore_count = 0
-
-    for col in row.index:
-        if 'Actual_' in col:
-            field_base = col.split('Actual_')[1]
-            expected_col = f'Expected_{field_base}'
-            result_col = f'Result_{field_base}'
-            ignore_col = f'Ignore_{field_base}'
-
-            actual_value = row[col]
-            expected_value = row.get(expected_col, None)
-            result_status = row.get(result_col, None)
-            ignore_status = row.get(ignore_col, None)
-
-            if result_status == 'Pass':
-                pass_count += 1
-            elif result_status == 'Fail':
-                fail_count += 1
-            if pd.notna(ignore_status):
-                ignore_count += 1
-
-            details.append({
-                'ScenarioID': scenario_id,
-                'FieldName': field_base,
-                'ActualValue': actual_value,
-                'ExpectedValue': expected_value,
-                'FieldStatus': result_status if pd.notna(result_status) else 'Ignore'
-            })
-
-    summary = {
-        'TestcaseID': row.name,
-        'ScenarioID': scenario_id,
-        'PassCount': pass_count,
-        'FailCount': fail_count,
-        'IgnoreCount': ignore_count
+def main():
+    # Your JSON data (example)
+    json_data = {
+        "data": [
+            {"id": 1, "name": "John"},
+            {"id": 2, "name": "Alice"},
+            {"id": 3, "name": "Bob"},
+            {"id": 4, "name": "Jane"},
+            {"id": 5, "name": "Eve"}
+            # More data...
+        ]
     }
-    return summary, details
 
-# Applying the process_row function to each row
-summaries = []
-all_details = []
-for index, row in df.iterrows():
-    summary, details = process_row(row)
-    summaries.append(summary)
-    all_details.extend(details)
+    # Set the chunk size as per your requirement
+    chunk_size = 2  # Adjust this value as needed
 
-# Convert results to JSON
-json_summary = json.dumps(summaries, indent=4)
-json_details = json.dumps(all_details, indent=4)
+    # Split JSON data into chunks
+    json_chunks = split_json(json_data["data"], chunk_size)
 
-# Print or save the JSON outputs
-print("Summary JSON Output:")
-print(json_summary)
-print("\nDetailed JSON Output:")
-print(json_details)
+    # Specify your endpoint
+    endpoint = 'http://your-endpoint-url.com'
+
+    # Send each chunk to the endpoint
+    send_chunks_to_endpoint(json_chunks, endpoint)
+
+if __name__ == "__main__":
+    main()
