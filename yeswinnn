@@ -17,24 +17,22 @@ def send_chunks_to_endpoint(chunks, endpoint):
         except Exception as e:
             print("Error:", e)
 
-def main():
+def process_json_chunks():
     # Your JSON data (example)
-    json_data = {
-        "data": [
-            {"id": 1, "name": "John"},
-            {"id": 2, "name": "Alice"},
-            {"id": 3, "name": "Bob"},
-            {"id": 4, "name": "Jane"},
-            {"id": 5, "name": "Eve"}
-            # More data...
-        ]
-    }
+    json_data = [
+        {"id": 1, "name": "John"},
+        {"id": 2, "name": "Alice"},
+        {"id": 3, "name": "Bob"},
+        {"id": 4, "name": "Jane"},
+        {"id": 5, "name": "Eve"}
+        # More data...
+    ]
 
     # Set the chunk size as per your requirement
     chunk_size = 2  # Adjust this value as needed
 
     # Split JSON data into chunks
-    json_chunks = split_json(json_data["data"], chunk_size)
+    json_chunks = split_json(json_data, chunk_size)
 
     # Specify your endpoint
     endpoint = 'http://your-endpoint-url.com'
@@ -43,4 +41,4 @@ def main():
     send_chunks_to_endpoint(json_chunks, endpoint)
 
 if __name__ == "__main__":
-    main()
+    process_json_chunks()
