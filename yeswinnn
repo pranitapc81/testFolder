@@ -2,39 +2,47 @@ import pandas as pd
 import json
 from datetime import datetime
 
-# Read Excel data into DataFrame (replace 'your_excel_file.xlsx' with your file path)
-df = pd.read_excel("your_excel_file.xlsx")
+# Assuming df is your DataFrame read from the Excel file
 
 # Helper function to generate a scenario ID
 def get_scenario_id():
-    return 'sc_' + datetime.now().strftime('%Y%m%dT%H%M%S')
+    # Generates a unique scenario ID based on the current datetime
+    return 'sc_' + datetime.now().strftime('%Y%m%d%H%M%S%f')
 
-# Function to extract trio field details for each row
-def extract_trio_details(row, scenario_id):
+# Function to extract trio field details for each row, generating unique scenario IDs
+def extract_trio_details(row):
+    scenario_id = get_scenario_id()  # Unique for each row
     details = []
     for col in row.index:
         if 'Actual_' in col:
-            field_name = col.split('Actual_')[-1]
-            actual_value = row[col]
-            expected_col = 'Expected_' + field_name
-            expected_value = row[expected_col] if expected_col in row.index else None
-            result_col = 'Result_' + field_name
-            field_status = row[result_col] if result_col in row.index else None
+            field_base = col.split('Actual_')[1]
+            expected_col = f'Expected_{field_base}'
+            result_col = f'Result_{field_base}'
+            ignore_col = f'Ignore_{field_base}'
+
+            # Determine the status of the field (Result or Ignore)
+            if result_col in row.index and pd.notna(row[result_col]):
+                field_status = row[result_col]
+            elif ignore_col in row.index and pd.notna(row[ignore_col]):
+                field_status = 'Ignore'
+            else:
+                field_status = None  # Adjust based on data or requirements
+            
             details.append({
                 'ScenarioID': scenario_id,
-                'FieldName': field_name,
-                'ActualValue': actual_value,
-                'ExpectedValue': expected_value,
+                'FieldName': field_base,
+                'ActualValue': row[col],
+                'ExpectedValue': row[expected_col] if expected_col in row.index else None,
                 'FieldStatus': field_status
             })
     return details
 
-# Function to process each row for the first JSON output
-def process_row(row):
-    scenario_id = get_scenario_id()  # Generate scenario_id for each row
+# Process each row for the summary JSON output
+def process_summary(row):
+    scenario_id = get_scenario_id()  # Unique for each row
     pass_count = sum(row[col] == 'Pass' for col in row.index if 'Result_' in col)
     fail_count = sum(row[col] == 'Fail' for col in row.index if 'Result_' in col)
-    ignore_count = sum(row[col] == 'Ignore' for col in row.index if 'Ignore_' in col)
+    ignore_count = sum(1 for col in row.index if 'Ignore_' in col and pd.notna(row[col]))
 
     return {
         'TestcaseID': row.name,
@@ -44,25 +52,16 @@ def process_row(row):
         'IgnoreCount': ignore_count
     }
 
-# Generate scenario ID (same for all rows if you run this once per dataset)
-scenario_id = get_scenario_id()
+# Applying the functions
+df_details = df.apply(lambda row: extract_trio_details(row), axis=1)
+summary_results = df.apply(lambda row: process_summary(row), axis=1)
 
-# Extract trio details for all rows
-all_trio_details = []
-for index, row in df.iterrows():
-    all_trio_details.extend(extract_trio_details(row, scenario_id))
+# Convert results to JSON
+json_details = json.dumps(list(df_details.sum()), indent=4)  # .sum() is used to flatten the list of lists
+json_summary = json.dumps(list(summary_results), indent=4)
 
-# Apply function to each row for the first JSON output and store results in a list
-results = df.apply(process_row, axis=1)
-
-# Convert list of dictionaries to JSON for the first output
-json_result_1 = json.dumps(list(results), indent=4)
-
-# Convert list of dictionaries to JSON for the second output
-json_result_2 = json.dumps(all_trio_details, indent=4)
-
-# Print both JSON outputs
-print("JSON Output 1:")
-print(json_result_1)
-print("\nJSON Output 2:")
-print(json_result_2)
+# Print or save the JSON outputs
+print("Detailed JSON Output:")
+print(json_details)
+print("\nSummary JSON Output:")
+print(json_summary)
