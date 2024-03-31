@@ -1,0 +1,6 @@
+    def update_ignore_column_values(self):
+        result_columns = ['result_' + column for column in self.ignore_columns]
+        for column in result_columns:
+            if column in self.comparison_df.columns:
+                self.comparison_df[column] = self.comparison_df[column].apply(lambda value: 'Ignore_' + value)
+
