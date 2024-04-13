@@ -1,0 +1,48 @@
+from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy.sql import func
+
+class DB2Connection:
+    def __init__(self, username, password, host, port, database):
+        self.username = username
+        self.password = password
+        self.host = host
+        self.port = port
+        self.database = database
+        self.connection_string = f'db2+ibm_db://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}'
+        self.engine = None
+        self.metadata = None
+
+    def connect(self):
+        self.engine = create_engine(self.connection_string)
+        self.metadata = MetaData()
+        self.metadata.reflect(bind=self.engine)
+
+    def execute_query(self, query):
+        with self.engine.connect() as connection:
+            result = connection.execute(query)
+            return result.fetchall()
+
+    def get_table(self, table_name):
+        return Table(table_name, self.metadata, autoload=True, autoload_with=self.engine)
+
+    def insert_record(self, table_name, **kwargs):
+        table = self.get_table(table_name)
+        with self.engine.connect() as connection:
+            insert_statement = table.insert().values(**kwargs)
+            connection.execute(insert_statement)
+
+# Example usage:
+# Assuming you have an 'execution' table with columns id, name, assetclass, and date
+db2_connection = DB2Connection(username='your_username', password='your_password', host='your_host', port='your_port', database='your_database')
+db2_connection.connect()
+
+# Example data for insertion
+data = {
+    'id': 1,
+    'name': 'John Doe',
+    'assetclass': 'Equity',
+    'date': '2024-04-13'
+}
+
+# Inserting the record into the 'execution' table
+db2_connection.insert_record('execution', **data)
