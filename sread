@@ -1,0 +1,50 @@
+import pandas as pd
+import json
+
+class ExcelToJsonConverter:
+    def __init__(self, file_path, sheet_name):
+        self.file_path = file_path
+        self.sheet_name = sheet_name
+        self.df = None
+
+    def read_excel(self):
+        """Reads an Excel file into a DataFrame."""
+        self.df = pd.read_excel(self.file_path, sheet_name=self.sheet_name)
+        self.df = self.df.astype(str)  # Convert all data to strings
+
+    def convert_to_json(self):
+        """Converts the DataFrame to a JSON formatted string."""
+        if self.df is None:
+            raise ValueError("Data frame is empty. Please read the Excel file first.")
+
+        json_array = []
+        for _, row in self.df.iterrows():
+            scenario_dict = {
+                "scenarioid": row['scenarioid'],
+                "scenarioname": row['scenarioname'],
+                "attributes": []
+            }
+            for column in self.df.columns.drop(['scenarioid', 'scenarioname']):
+                attribute_dict = {
+                    "attributename": column,
+                    "attributevalue": row[column]
+                }
+                scenario_dict["attributes"].append(attribute_dict)
+
+            json_array.append(scenario_dict)
+
+        return json.dumps(json_array, indent=4)
+
+    def save_json(self, json_string, output_file):
+        """Saves the JSON string to a file."""
+        with open(output_file, 'w') as file:
+            file.write(json_string)
+
+# Example usage of the class
+if __name__ == "__main__":
+    converter = ExcelToJsonConverter('path_to_your_excel_file.xlsx', 'Sheet1')
+    converter.read_excel()
+    json_output = converter.convert_to_json()
+    print(json_output)
+    # Optionally save the output to a file
+    # converter.save_json(json_output, 'output.json')
