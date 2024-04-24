@@ -1,0 +1,79 @@
+import unittest
+from unittest.mock import patch, MagicMock
+import pandas as pd
+from io import StringIO
+
+# Assuming the ExcelToJsonConverter class code is available here or imported
+
+class TestExcelToJsonConverter(unittest.TestCase):
+    def setUp(self):
+        # Set up the necessary initializations for each test
+        self.file_path = 'test_excel_file.xlsx'
+        self.sheet_name = 'TestSheet'
+        self.converter = ExcelToJsonConverter(self.file_path, self.sheet_name)
+
+    @patch('pandas.read_excel')
+    def test_read_excel(self, mock_read_excel):
+        # Mocking pandas.read_excel to simulate reading an excel file
+        mock_df = pd.DataFrame({
+            'scenarioid': ['101', '102'],
+            'scenarioname': ['Scenario A', 'Scenario B'],
+            'Attribute1': ['Value1', 'Value2'],
+            'Attribute2': ['Value3', 'Value4']
+        })
+        mock_read_excel.return_value = mock_df
+
+        self.converter.read_excel()
+
+        # Test if DataFrame is correctly assigned and data types are converted to strings
+        pd.testing.assert_frame_equal(self.converter.df, mock_df.astype(str))
+        self.assertTrue(self.converter.df.dtypes.equals(pd.Series([str, str, str, str], index=mock_df.columns)))
+
+    def test_convert_to_json(self):
+        # Manually setting up a DataFrame
+        self.converter.df = pd.DataFrame({
+            'scenarioid': ['101', '102'],
+            'scenarioname': ['Scenario A', 'Scenario B'],
+            'Attribute1': ['Value1', 'Value2'],
+            'Attribute2': ['Value3', 'Value4']
+        }).astype(str)
+
+        expected_json_output = json.dumps([
+            {
+                "scenarioid": "101",
+                "scenarioname": "Scenario A",
+                "attributes": [
+                    {"attributename": "Attribute1", "attributevalue": "Value1"},
+                    {"attributename": "Attribute2", "attributevalue": "Value3"}
+                ]
+            },
+            {
+                "scenarioid": "102",
+                "scenarioname": "Scenario B",
+                "attributes": [
+                    {"attributename": "Attribute1", "attributevalue": "Value2"},
+                    {"attributename": "Attribute2", "attributevalue": "Value4"}
+                ]
+            }
+        ], indent=4)
+
+        # Run the conversion method
+        result_json = self.converter.convert_to_json()
+
+        # Compare the expected JSON string with the result
+        self.assertEqual(result_json, expected_json_output)
+
+    @patch('builtins.open', new_callable=unittest.mock.mock_open)
+    def test_save_json(self, mock_file_open):
+        # Mocking open function to test file writing
+        json_data = '{"test": "data"}'
+        output_file = 'output.json'
+        
+        self.converter.save_json(json_data, output_file)
+
+        # Assert that open was called correctly and json_data was written to file
+        mock_file_open.assert_called_with(output_file, 'w')
+        mock_file_open().write.assert_called_once_with(json_data)
+
+if __name__ == '__main__':
+    unittest.main()
