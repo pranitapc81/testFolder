@@ -1,31 +1,26 @@
 import unittest
-from unittest.mock import patch
-from sqlalchemy import create_engine
+from unittest.mock import patch, MagicMock
 from sqlalchemy.orm import sessionmaker, scoped_session
-from models import Execution, Base  # Assuming Execution and Base are defined in models.py
-from execution_dao import ExecutionDAO  # Assuming ExecutionDAO is defined in execution_dao.py
-
-# Define a temporary SQLite database in memory for testing
-TEST_DATABASE_URL = 'sqlite:///:memory:'
+from unified_alchemy_magic_mock import AlchemyMagicMock
+from models import Execution, Base
+from execution_dao import ExecutionDAO  # Adjust according to your project structure
+from db2_connector import DB2Connector  # Adjust according to your project structure
 
 class TestExecutionDAO(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # Setup in-memory SQLite database
-        cls.engine = create_engine(TEST_DATABASE_URL, echo=False)
+        cls.engine = AlchemyMagicMock()
         Base.metadata.create_all(cls.engine)
         cls.Session = scoped_session(sessionmaker(bind=cls.engine))
 
     def setUp(self):
-        # Patch the ExecutionDAO to use the in-memory SQLite database
-        patcher = patch('execution_dao.create_engine', return_value=self.engine)
-        self.addCleanup(patcher.stop)
-        self.mock_create_engine = patcher.start()
+        # Mock DB2Connector to return the in-memory SQLite session
+        self.mock_connector = MagicMock(spec=DB2Connector)
+        self.mock_connector.get_session.return_value = self.Session()
 
-        # Create an instance of ExecutionDAO
-        self.dao = ExecutionDAO()
-        self.dao.Session = self.Session
-        self.dao.session = self.Session()
+        # Create an instance of ExecutionDAO with the mocked connector
+        self.dao = ExecutionDAO(self.mock_connector)
 
     def tearDown(self):
         self.dao.session.rollback()
