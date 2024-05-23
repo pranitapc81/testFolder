@@ -2,28 +2,119 @@ from datetime import datetime
 import uuid
 
 class Execution:
-    def __init__(self, name: str, asset_class_id: str, start_ts: Optional[datetime] = None, 
-                 end_ts: Optional[datetime] = None, status: Optional[str] = None, 
-                 passed_scenarios: int = 0, failed_scenarios: int = 0, id: Optional[int] = None):
-        self.id = id or (uuid.uuid4().int & ((1 << 64) - 1))
-        self.name = name
-        self.asset_class_id = asset_class_id
-        self.start_ts = start_ts or datetime.now()
-        self.end_ts = end_ts
-        self.status = status
-        self.passed_scenarios = passed_scenarios
-        self.failed_scenarios = failed_scenarios
+    def __init__(self, mandate_id: int, asset_class_id: int, name: str, start_ts: datetime = None, 
+                 end_ts: datetime = None, status: str = "", passed_scenarios: int = 0, failed_scenarios: int = 0, id: int = None):
+        self._id = id or uuid.uuid4().int
+        self._mandate_id = mandate_id
+        self._asset_class_id = asset_class_id
+        self._name = name
+        self._start_ts = start_ts or datetime.now()
+        self._end_ts = end_ts
+        self._status = status
+        self._passed_scenarios = passed_scenarios
+        self._failed_scenarios = failed_scenarios
+
+    # Getter and Setter for id
+    @property
+    def id(self):
+        return self._id
+
+    @id.setter
+    def id(self, value):
+        self._id = value
+
+    # Getter and Setter for mandate_id
+    @property
+    def mandate_id(self):
+        return self._mandate_id
+
+    @mandate_id.setter
+    def mandate_id(self, value):
+        self._mandate_id = value
+
+    # Getter and Setter for asset_class_id
+    @property
+    def asset_class_id(self):
+        return self._asset_class_id
+
+    @asset_class_id.setter
+    def asset_class_id(self, value):
+        self._asset_class_id = value
+
+    # Getter and Setter for name
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, value):
+        self._name = value
+
+    # Getter and Setter for start_ts
+    @property
+    def start_ts(self):
+        return self._start_ts
+
+    @start_ts.setter
+    def start_ts(self, value):
+        self._start_ts = value
+
+    # Getter and Setter for end_ts
+    @property
+    def end_ts(self):
+        return self._end_ts
+
+    @end_ts.setter
+    def end_ts(self, value):
+        self._end_ts = value
+
+    # Getter and Setter for status
+    @property
+    def status(self):
+        return self._status
+
+    @status.setter
+    def status(self, value):
+        self._status = value
+
+    # Getter and Setter for passed_scenarios
+    @property
+    def passed_scenarios(self):
+        return self._passed_scenarios
+
+    @passed_scenarios.setter
+    def passed_scenarios(self, value):
+        self._passed_scenarios = value
+
+    # Getter and Setter for failed_scenarios
+    @property
+    def failed_scenarios(self):
+        return self._failed_scenarios
+
+    @failed_scenarios.setter
+    def failed_scenarios(self, value):
+        self._failed_scenarios = value
 
     def __repr__(self):
-        return (f"Execution(id={self.id}, name={self.name}, asset_class_id={self.asset_class_id}, "
-                f"start_ts={self.start_ts}, end_ts={self.end_ts}, status={self.status}, "
-                f"passed_scenarios={self.passed_scenarios}, failed_scenarios={self.failed_scenarios})")
+        return (f"Execution(id={self._id}, mandate_id={self._mandate_id}, asset_class_id={self._asset_class_id}, "
+                f"name={self._name}, start_ts={self._start_ts}, end_ts={self._end_ts}, status={self._status}, "
+                f"passed_scenarios={self._passed_scenarios}, failed_scenarios={self._failed_scenarios})")
 
-# Example usage:
+# Example usage
 execution = Execution(
+    mandate_id=123,
+    asset_class_id=456,
     name="Sample Execution",
-    asset_class_id="Asset123",
     status="InProgress"
 )
+
 print(execution)
 
+# Accessing and modifying attributes using getter and setter methods
+print(f"Original name: {execution.name}")
+execution.name = "Updated Execution Name"
+print(f"Updated name: {execution.name}")
+
+print(f"Original passed_scenarios: {execution.passed_scenarios}")
+execution.passed_scenarios = 5
+print(f"Updated passed_scenarios: {execution.passed_scenarios}")
