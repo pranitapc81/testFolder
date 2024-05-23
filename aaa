@@ -72,4 +72,8 @@ class TestExecutionDAO(unittest.TestCase):
 
     def test_delete_non_existent_execution(self):
         # Attempt to delete a non-existent execution
-        with self.assertRaises
+        with self.assertRaises(Exception):
+            self.dao.delete(-1)  # Assuming execution with id=-1 doesn't exist
+
+if __name__ == '__main__':
+    unittest.main()
