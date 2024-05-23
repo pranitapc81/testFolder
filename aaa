@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, scoped_session
 from models import Execution, Base  # Assuming Execution and Base are defined in models.py
 from execution_dao import ExecutionDAO  # Assuming ExecutionDAO is defined in execution_dao.py
 
@@ -12,16 +12,16 @@ class TestExecutionDAO(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # Setup in-memory SQLite database
-        cls.engine = create_engine(TEST_DATABASE_URL, echo=True)
+        cls.engine = create_engine(TEST_DATABASE_URL, echo=False)
         Base.metadata.create_all(cls.engine)
-        cls.Session = sessionmaker(bind=cls.engine)
+        cls.Session = scoped_session(sessionmaker(bind=cls.engine))
 
     def setUp(self):
         # Patch the ExecutionDAO to use the in-memory SQLite database
         patcher = patch('execution_dao.create_engine', return_value=self.engine)
         self.addCleanup(patcher.stop)
         self.mock_create_engine = patcher.start()
-        
+
         # Create an instance of ExecutionDAO
         self.dao = ExecutionDAO()
         self.dao.Session = self.Session
@@ -72,8 +72,4 @@ class TestExecutionDAO(unittest.TestCase):
 
     def test_delete_non_existent_execution(self):
         # Attempt to delete a non-existent execution
-        with self.assertRaises(Exception):
-            self.dao.delete(-1)  # Assuming execution with id=-1 doesn't exist
-
-if __name__ == '__main__':
-    unittest.main()
+        with self.assertRaises
