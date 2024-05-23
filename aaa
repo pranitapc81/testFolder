@@ -1,42 +1,42 @@
 import unittest
-from sqlalchemy import create_engine, Column, Integer, String, DateTime
-from sqlalchemy.ext.declarative import declarative_base
+from unittest.mock import patch
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from datetime import datetime
-from execution_dao import ExecutionDAO, Execution  # Assuming Execution and ExecutionDAO are defined in execution_dao module
-
-Base = declarative_base()
+from models import Execution, Base  # Assuming Execution and Base are defined in models.py
+from execution_dao import ExecutionDAO  # Assuming ExecutionDAO is defined in execution_dao.py
 
 # Define a temporary SQLite database in memory for testing
 TEST_DATABASE_URL = 'sqlite:///:memory:'
 
-# SQLAlchemy model definition for Execution
-class Execution(Base):
-    __tablename__ = 'executions'
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.now)
-
-# Setup function to create database schema and session for testing
-def setup_module():
-    engine = create_engine(TEST_DATABASE_URL, echo=True)
-    Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
-    session = Session()
-
-    # Inject session into ExecutionDAO for testing
-    global dao
-    dao = ExecutionDAO(session)
-
-# Unit test class for ExecutionDAO
 class TestExecutionDAO(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # Setup in-memory SQLite database
+        cls.engine = create_engine(TEST_DATABASE_URL, echo=True)
+        Base.metadata.create_all(cls.engine)
+        cls.Session = sessionmaker(bind=cls.engine)
+
+    def setUp(self):
+        # Patch the ExecutionDAO to use the in-memory SQLite database
+        patcher = patch('execution_dao.create_engine', return_value=self.engine)
+        self.addCleanup(patcher.stop)
+        self.mock_create_engine = patcher.start()
+        
+        # Create an instance of ExecutionDAO
+        self.dao = ExecutionDAO()
+        self.dao.Session = self.Session
+        self.dao.session = self.Session()
+
+    def tearDown(self):
+        self.dao.session.rollback()
+        self.dao.session.close()
+
     def test_save_execution(self):
         execution = Execution(name="Test Execution")
-        dao.save(execution)
+        self.dao.save(execution)
 
         # Verify execution was saved
-        saved_execution = dao.session.query(Execution).filter_by(name="Test Execution").first()
+        saved_execution = self.dao.session.query(Execution).filter_by(name="Test Execution").first()
         self.assertIsNotNone(saved_execution)
         self.assertEqual(saved_execution.name, "Test Execution")
 
@@ -48,10 +48,10 @@ class TestExecutionDAO(unittest.TestCase):
             Execution(name="Execution 3")
         ]
         for execution in executions:
-            dao.save(execution)
+            self.dao.save(execution)
 
         # Retrieve all executions
-        all_executions = dao.get_all_executions()
+        all_executions = self.dao.get_all_executions()
 
         # Verify all executions were retrieved
         self.assertEqual(len(all_executions), 3)
@@ -61,20 +61,19 @@ class TestExecutionDAO(unittest.TestCase):
 
     def test_delete_execution(self):
         execution = Execution(name="Execution to delete")
-        dao.save(execution)
+        self.dao.save(execution)
 
         # Delete the execution
-        dao.delete(execution.id)
+        self.dao.delete(execution.id)
 
         # Verify execution was deleted
-        deleted_execution = dao.session.query(Execution).get(execution.id)
+        deleted_execution = self.dao.session.query(Execution).get(execution.id)
         self.assertIsNone(deleted_execution)
 
-    def test_error_handling(self):
+    def test_delete_non_existent_execution(self):
         # Attempt to delete a non-existent execution
         with self.assertRaises(Exception):
-            dao.delete(-1)  # Assuming execution with id=-1 doesn't exist
+            self.dao.delete(-1)  # Assuming execution with id=-1 doesn't exist
 
 if __name__ == '__main__':
     unittest.main()
-
