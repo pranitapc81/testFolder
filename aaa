@@ -1,1 +1,29 @@
+from datetime import datetime
+import uuid
+
+class Execution:
+    def __init__(self, name: str, asset_class_id: str, start_ts: Optional[datetime] = None, 
+                 end_ts: Optional[datetime] = None, status: Optional[str] = None, 
+                 passed_scenarios: int = 0, failed_scenarios: int = 0, id: Optional[int] = None):
+        self.id = id or (uuid.uuid4().int & ((1 << 64) - 1))
+        self.name = name
+        self.asset_class_id = asset_class_id
+        self.start_ts = start_ts or datetime.now()
+        self.end_ts = end_ts
+        self.status = status
+        self.passed_scenarios = passed_scenarios
+        self.failed_scenarios = failed_scenarios
+
+    def __repr__(self):
+        return (f"Execution(id={self.id}, name={self.name}, asset_class_id={self.asset_class_id}, "
+                f"start_ts={self.start_ts}, end_ts={self.end_ts}, status={self.status}, "
+                f"passed_scenarios={self.passed_scenarios}, failed_scenarios={self.failed_scenarios})")
+
+# Example usage:
+execution = Execution(
+    name="Sample Execution",
+    asset_class_id="Asset123",
+    status="InProgress"
+)
+print(execution)
 
