@@ -1,113 +1,16 @@
-import unittest
-from unittest.mock import patch, MagicMock
-from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy import create_engine
-from datetime import datetime
-from models import Execution, Base
-from execution_dao import ExecutionDAO
+from sqlalchemy.orm import sessionmaker
 
-# Define an in-memory SQLite database for testing
-TEST_DATABASE_URL = 'sqlite:///:memory:'
+class DB2Connector:
+    _instance = None
 
-class TestExecutionDAO(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        # Setup in-memory SQLite database
-        cls.engine = create_engine(TEST_DATABASE_URL, echo=False)
-        Base.metadata.create_all(cls.engine)
-        cls.Session = scoped_session(sessionmaker(bind=cls.engine))
+    def __new__(cls, db_url):
+        if cls._instance is None:
+            cls._instance = super(DB2Connector, cls).__new__(cls)
+            cls._instance.db_url = db_url
+            cls._instance.engine = create_engine(db_url)
+            cls._instance.Session = sessionmaker(bind=cls._instance.engine)
+        return cls._instance
 
-    def setUp(self):
-        # Patch DB2Connector to use the in-memory SQLite session
-        patcher = patch('db2_connector.DB2Connector.get_session', return_value=self.Session())
-        self.addCleanup(patcher.stop)
-        self.mock_get_session = patcher.start()
-
-        # Create an instance of ExecutionDAO
-        self.dao = ExecutionDAO()
-
-    def tearDown(self):
-        self.dao.session.rollback()
-        self.dao.session.close()
-
-    def test_save_execution(self):
-        execution = Execution(
-            name="Test Execution",
-            mandate_id=1,
-            asset_class_id=1,
-            start_ts=datetime(2023, 5, 26, 0, 0, 0),
-            end_ts=datetime(2023, 5, 26, 1, 0, 0),
-            status="Completed"
-        )
-        self.dao.save(execution)
-
-        # Verify execution was saved
-        saved_execution = self.dao.session.query(Execution).filter_by(name="Test Execution").first()
-        self.assertIsNotNone(saved_execution)
-        self.assertEqual(saved_execution.name, "Test Execution")
-
-    def test_get_all_executions(self):
-        # Insert test data
-        executions = [
-            Execution(
-                name="Execution 1",
-                mandate_id=1,
-                asset_class_id=1,
-                start_ts=datetime(2023, 5, 26, 0, 0, 0),
-                end_ts=datetime(2023, 5, 26, 1, 0, 0),
-                status="Completed"
-            ),
-            Execution(
-                name="Execution 2",
-                mandate_id=1,
-                asset_class_id=1,
-                start_ts=datetime(2023, 5, 26, 0, 0, 0),
-                end_ts=datetime(2023, 5, 26, 1, 0, 0),
-                status="Completed"
-            ),
-            Execution(
-                name="Execution 3",
-                mandate_id=1,
-                asset_class_id=1,
-                start_ts=datetime(2023, 5, 26, 0, 0, 0),
-                end_ts=datetime(2023, 5, 26, 1, 0, 0),
-                status="Completed"
-            )
-        ]
-        for execution in executions:
-            self.dao.save(execution)
-
-        # Retrieve all executions
-        all_executions = self.dao.get_all_executions()
-
-        # Verify all executions were retrieved
-        self.assertEqual(len(all_executions), 3)
-        self.assertEqual(all_executions[0].name, "Execution 1")
-        self.assertEqual(all_executions[1].name, "Execution 2")
-        self.assertEqual(all_executions[2].name, "Execution 3")
-
-    def test_delete_execution(self):
-        execution = Execution(
-            name="Execution to delete",
-            mandate_id=1,
-            asset_class_id=1,
-            start_ts=datetime(2023, 5, 26, 0, 0, 0),
-            end_ts=datetime(2023, 5, 26, 1, 0, 0),
-            status="Completed"
-        )
-        self.dao.save(execution)
-
-        # Delete the execution
-        self.dao.delete(execution.id)
-
-        # Verify execution was deleted
-        deleted_execution = self.dao.session.query(Execution).get(execution.id)
-        self.assertIsNone(deleted_execution)
-
-    def test_delete_non_existent_execution(self):
-        # Attempt to delete a non-existent execution
-        with self.assertRaises(Exception):
-            self.dao.delete(-1)  # Assuming execution with id=-1 doesn't exist
-
-if __name__ == '__main__':
-    unittest.main()
+    def get_session(self):
+        return self.Session()
