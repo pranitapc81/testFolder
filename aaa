@@ -19,9 +19,13 @@ class TestExecutionDAO(unittest.TestCase):
 
     def setUp(self):
         # Patch DB2Connector to use the in-memory SQLite session
-        patcher = patch('db2_connector.DB2Connector.get_session', return_value=self.Session())
-        self.addCleanup(patcher.stop)
-        self.mock_get_session = patcher.start()
+        self.patcher = patch('execution_dao.DB2Connector')
+        self.mock_db2_connector = self.patcher.start()
+        self.addCleanup(self.patcher.stop)
+        
+        # Configure the mock DB2Connector instance
+        self.mock_db2_connector_instance = self.mock_db2_connector.return_value
+        self.mock_db2_connector_instance.get_session.return_value = self.Session()
 
         # Create an instance of ExecutionDAO
         self.dao = ExecutionDAO()
