@@ -2,9 +2,10 @@ import unittest
 from unittest.mock import MagicMock
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy import create_engine
+from datetime import datetime
 from models import Execution, Base
-from db2_connector import DB2Connector
 from execution_dao import ExecutionDAO
+from db2_connector import DB2Connector
 
 # Define an in-memory SQLite database for testing
 TEST_DATABASE_URL = 'sqlite:///:memory:'
@@ -30,7 +31,14 @@ class TestExecutionDAO(unittest.TestCase):
         self.dao.session.close()
 
     def test_save_execution(self):
-        execution = Execution(name="Test Execution")
+        execution = Execution(
+            name="Test Execution",
+            mandate_id=1,
+            asset_class_id=1,
+            start_ts=datetime(2023, 5, 26, 0, 0, 0),
+            end_ts=datetime(2023, 5, 26, 1, 0, 0),
+            status="Completed"
+        )
         self.dao.save(execution)
 
         # Verify execution was saved
@@ -41,9 +49,30 @@ class TestExecutionDAO(unittest.TestCase):
     def test_get_all_executions(self):
         # Insert test data
         executions = [
-            Execution(name="Execution 1"),
-            Execution(name="Execution 2"),
-            Execution(name="Execution 3")
+            Execution(
+                name="Execution 1",
+                mandate_id=1,
+                asset_class_id=1,
+                start_ts=datetime(2023, 5, 26, 0, 0, 0),
+                end_ts=datetime(2023, 5, 26, 1, 0, 0),
+                status="Completed"
+            ),
+            Execution(
+                name="Execution 2",
+                mandate_id=1,
+                asset_class_id=1,
+                start_ts=datetime(2023, 5, 26, 0, 0, 0),
+                end_ts=datetime(2023, 5, 26, 1, 0, 0),
+                status="Completed"
+            ),
+            Execution(
+                name="Execution 3",
+                mandate_id=1,
+                asset_class_id=1,
+                start_ts=datetime(2023, 5, 26, 0, 0, 0),
+                end_ts=datetime(2023, 5, 26, 1, 0, 0),
+                status="Completed"
+            )
         ]
         for execution in executions:
             self.dao.save(execution)
@@ -58,7 +87,14 @@ class TestExecutionDAO(unittest.TestCase):
         self.assertEqual(all_executions[2].name, "Execution 3")
 
     def test_delete_execution(self):
-        execution = Execution(name="Execution to delete")
+        execution = Execution(
+            name="Execution to delete",
+            mandate_id=1,
+            asset_class_id=1,
+            start_ts=datetime(2023, 5, 26, 0, 0, 0),
+            end_ts=datetime(2023, 5, 26, 1, 0, 0),
+            status="Completed"
+        )
         self.dao.save(execution)
 
         # Delete the execution
