@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy import create_engine
 from datetime import datetime
 from models import Execution, Base
-from execution_dao import ExecutionDAO
+from dao.execution_dao import ExecutionDAO  # Adjust the import path as per your project structure
 
 # Define an in-memory SQLite database for testing
 TEST_DATABASE_URL = 'sqlite:///:memory:'
@@ -18,15 +18,16 @@ class TestExecutionDAO(unittest.TestCase):
         cls.Session = scoped_session(sessionmaker(bind=cls.engine))
 
     def setUp(self):
-        # Patch DB2Connector to use the in-memory SQLite session
-        self.patcher = patch('execution_dao.DB2Connector')
-        self.mock_db2_connector = self.patcher.start()
-        self.addCleanup(self.patcher.stop)
+        # Patch DB2Connector in db_operation.db_connector
+        self.db_connector_patcher = patch('db_operation.db_connector.DB2Connector')
+        self.mock_db_connector_class = self.db_connector_patcher.start()
+        self.addCleanup(self.db_connector_patcher.stop)
         
-        # Configure the mock DB2Connector instance
-        self.mock_db2_connector_instance = self.mock_db2_connector.return_value
-        self.mock_db2_connector_instance.get_session.return_value = self.Session()
-
+        # Mock the instance of DB2Connector
+        self.mock_db_connector_instance = MagicMock()
+        self.mock_db_connector_class.return_value = self.mock_db_connector_instance
+        self.mock_db_connector_instance.get_session.return_value = self.Session()
+        
         # Create an instance of ExecutionDAO
         self.dao = ExecutionDAO()
 
