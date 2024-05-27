@@ -1,11 +1,10 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import patch, MagicMock
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy import create_engine
 from datetime import datetime
 from models import Execution, Base
 from execution_dao import ExecutionDAO
-from db2_connector import DB2Connector
 
 # Define an in-memory SQLite database for testing
 TEST_DATABASE_URL = 'sqlite:///:memory:'
@@ -19,12 +18,13 @@ class TestExecutionDAO(unittest.TestCase):
         cls.Session = scoped_session(sessionmaker(bind=cls.engine))
 
     def setUp(self):
-        # Mock DB2Connector to use the in-memory SQLite session
-        self.mock_connector = MagicMock(spec=DB2Connector)
-        self.mock_connector.get_session.return_value = self.Session()
+        # Patch DB2Connector to use the in-memory SQLite session
+        patcher = patch('db2_connector.DB2Connector.get_session', return_value=self.Session())
+        self.addCleanup(patcher.stop)
+        self.mock_get_session = patcher.start()
 
-        # Create an instance of ExecutionDAO with the mocked connector
-        self.dao = ExecutionDAO(self.mock_connector)
+        # Create an instance of ExecutionDAO
+        self.dao = ExecutionDAO()
 
     def tearDown(self):
         self.dao.session.rollback()
