@@ -1,93 +1,70 @@
 import unittest
-from unittest.mock import MagicMock
-from sqlalchemy.orm import Session
-from execution_dao import ExecutionDAO, Execution  # Import your DAO class and Execution class
+from unittest.mock import MagicMock, call
+from execution_dao import ExecutionDAO, Execution
+from execution_service import ExecutionService
 
-
-class TestExecutionDAO(unittest.TestCase):
+class TestExecutionService(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # Class-level setup: Runs once before all tests
-        cls.mock_db2connection = MagicMock()
-        cls.mock_session = MagicMock(spec=Session)
-        cls.mock_db2connection.session = cls.mock_session
+        cls.mock_execution_dao = MagicMock(spec=ExecutionDAO)
+        cls.setup_mock_data()
 
     @classmethod
     def tearDownClass(cls):
-        # Class-level teardown: Runs once after all tests
         pass
 
-    def setUp(self):
-        # Method-level setup: Runs before each test
-        self.dao = ExecutionDAO(self.mock_db2connection)
-        self.setup_mock_data()
-
-    def tearDown(self):
-        # Method-level teardown: Runs after each test
-        self.mock_session.reset_mock()
-
-    def setup_mock_data(self):
-        # Setup mock data for use in tests
-        self.mock_executions = [
+    @classmethod
+    def setup_mock_data(cls):
+        cls.mock_executions = [
             Execution(id=1, name="Execution 1", status="completed"),
             Execution(id=2, name="Execution 2", status="pending"),
         ]
 
+    def setUp(self):
+        self.service = ExecutionService(self.mock_execution_dao)
+        self.mock_execution_dao.reset_mock()
+
+    def tearDown(self):
+        pass
+
     def test_save_execution(self):
-        # Test saving an execution
-        execution = Execution(id=3, name="Execution 3", status="running")
-        self.dao.save_execution(execution)
-        
-        # Assert that session.add() was called with the execution object
-        self.mock_session.add.assert_called_once_with(execution)
+        name = "Execution 3"
+        status = "running"
+        new_execution = Execution(id=None, name=name, status=status)
 
-        # Assert that session.commit() was called once after adding the execution
-        self.mock_session.commit.assert_called_once()
+        self.service.create_execution(name, status)
+        
+        self.mock_execution_dao.save_execution.assert_called_once()
+        saved_execution = self.mock_execution_dao.save_execution.call_args[0][0]
+        self.assertEqual(saved_execution.name, name)
+        self.assertEqual(saved_execution.status, status)
 
-    def test_get_executions(self):
-        # Mock session.query().all() to return mock_executions
-        self.mock_session.query().all.return_value = self.mock_executions
+    def test_get_all_executions(self):
+        self.mock_execution_dao.get_executions.return_value = self.mock_executions
+
+        executions = self.service.get_all_executions()
         
-        executions = self.dao.get_executions()
-        
-        # Assert that query().all() was called on session with Execution
-        self.mock_session.query(Execution).all.assert_called_once()
-        
-        # Assert the returned executions match mock_executions
+        self.mock_execution_dao.get_executions.assert_called_once()
         self.assertEqual(executions, self.mock_executions)
 
     def test_get_execution_by_id(self):
-        # Test retrieving an execution by ID
         execution_id = 1
-        mock_execution = self.mock_executions[0]
+        self.mock_execution_dao.get_execution_by_id.return_value = self.mock_executions[0]
+
+        execution = self.service.get_execution_by_id(execution_id)
         
-        # Mock session.query().filter_by().first() to return mock_execution
-        self.mock_session.query(Execution).filter_by(id=execution_id).first.return_value = mock_execution
-        
-        execution = self.dao.get_execution_by_id(execution_id)
-        
-        # Assert that query().filter_by().first() was called with the correct execution_id
-        self.mock_session.query(Execution).filter_by(id=execution_id).first.assert_called_once()
-        
-        # Assert the returned execution object matches mock_execution
-        self.assertEqual(execution, mock_execution)
+        self.mock_execution_dao.get_execution_by_id.assert_called_once_with(execution_id)
+        self.assertEqual(execution, self.mock_executions[0])
 
     def test_get_execution_by_name(self):
-        # Test retrieving an execution by name
         execution_name = "Execution 1"
-        mock_execution = self.mock_executions[0]
+        self.mock_execution_dao.get_execution_by_name.return_value = self.mock_executions[0]
+
+        execution = self.service.get_execution_by_name(execution_name)
         
-        # Mock session.query().filter_by().first() to return mock_execution
-        self.mock_session.query(Execution).filter_by(name=execution_name).first.return_value = mock_execution
-        
-        execution = self.dao.get_execution_by_name(execution_name)
-        
-        # Assert that query().filter_by().first() was called with the correct name parameter
-        self.mock_session.query(Execution).filter_by(name=execution_name).first.assert_called_once()
-        
-        # Assert the returned execution object matches mock_execution
-        self.assertEqual(execution, mock_execution)
+        self.mock_execution_dao.get_execution_by_name.assert_called_once_with(execution_name)
+        self.assertEqual(execution, self.mock_executions[0])
 
 
 if __name__ == '__main__':
