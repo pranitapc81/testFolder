@@ -6,20 +6,37 @@ from execution_dao import ExecutionDAO, Execution  # Import your DAO class and E
 
 class TestExecutionDAO(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        # Class-level setup: Runs once before all tests
+        cls.mock_db2connection = MagicMock()
+        cls.mock_session = MagicMock(spec=Session)
+        cls.mock_db2connection.session = cls.mock_session
+
+    @classmethod
+    def tearDownClass(cls):
+        # Class-level teardown: Runs once after all tests
+        pass
+
     def setUp(self):
-        # Create a mock SQLAlchemy session
-        self.mock_session = MagicMock(spec=Session)
-        
-        # Mock db2connection and assign mock_session as its session attribute
-        self.mock_db2connection = MagicMock()
-        self.mock_db2connection.session = self.mock_session
-        
-        # Initialize ExecutionDAO with the mock db2connection
+        # Method-level setup: Runs before each test
         self.dao = ExecutionDAO(self.mock_db2connection)
+        self.setup_mock_data()
+
+    def tearDown(self):
+        # Method-level teardown: Runs after each test
+        self.mock_session.reset_mock()
+
+    def setup_mock_data(self):
+        # Setup mock data for use in tests
+        self.mock_executions = [
+            Execution(id=1, name="Execution 1", status="completed"),
+            Execution(id=2, name="Execution 2", status="pending"),
+        ]
 
     def test_save_execution(self):
         # Test saving an execution
-        execution = Execution(id=1, name="Execution 1", status="completed")
+        execution = Execution(id=3, name="Execution 3", status="running")
         self.dao.save_execution(execution)
         
         # Assert that session.add() was called with the execution object
@@ -29,30 +46,24 @@ class TestExecutionDAO(unittest.TestCase):
         self.mock_session.commit.assert_called_once()
 
     def test_get_executions(self):
-        # Test retrieving all executions
-        mock_execution_data = [
-            Execution(id=1, name="Execution 1", status="completed"),
-            Execution(id=2, name="Execution 2", status="pending"),
-        ]
-        
-        # Mock session.query().all() to return mock_execution_data
-        self.mock_session.query().all.return_value = mock_execution_data
+        # Mock session.query().all() to return mock_executions
+        self.mock_session.query().all.return_value = self.mock_executions
         
         executions = self.dao.get_executions()
         
         # Assert that query().all() was called on session with Execution
         self.mock_session.query(Execution).all.assert_called_once()
         
-        # Assert the returned executions match mock_execution_data
-        self.assertEqual(executions, mock_execution_data)
+        # Assert the returned executions match mock_executions
+        self.assertEqual(executions, self.mock_executions)
 
     def test_get_execution_by_id(self):
         # Test retrieving an execution by ID
         execution_id = 1
-        mock_execution = Execution(id=execution_id, name="Execution 1", status="completed")
+        mock_execution = self.mock_executions[0]
         
         # Mock session.query().filter_by().first() to return mock_execution
-        self.mock_session.query().filter_by().first.return_value = mock_execution
+        self.mock_session.query(Execution).filter_by(id=execution_id).first.return_value = mock_execution
         
         execution = self.dao.get_execution_by_id(execution_id)
         
@@ -65,10 +76,10 @@ class TestExecutionDAO(unittest.TestCase):
     def test_get_execution_by_name(self):
         # Test retrieving an execution by name
         execution_name = "Execution 1"
-        mock_execution = Execution(id=1, name=execution_name, status="completed")
+        mock_execution = self.mock_executions[0]
         
         # Mock session.query().filter_by().first() to return mock_execution
-        self.mock_session.query().filter_by(name=execution_name).first.return_value = mock_execution
+        self.mock_session.query(Execution).filter_by(name=execution_name).first.return_value = mock_execution
         
         execution = self.dao.get_execution_by_name(execution_name)
         
