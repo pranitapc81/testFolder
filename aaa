@@ -20,17 +20,12 @@ class TestExecutionDAO(unittest.TestCase):
         # Instantiate the ExecutionDAO with the mocked DB2Connector and env
         cls.dao = ExecutionDAO(env=cls.env)
 
+        # Set up mock data once for all tests
+        cls.setUpTestData()
+
     @classmethod
     def tearDownClass(cls):
         cls.db_connector_patcher.stop()
-
-    def setUp(self):
-        # Reset mock session for each test
-        self.mock_session.reset_mock()
-
-    def tearDown(self):
-        # Optionally perform cleanup after each test
-        pass
 
     @classmethod
     def setUpTestData(cls):
@@ -42,7 +37,13 @@ class TestExecutionDAO(unittest.TestCase):
                       start_ts='2023-05-27 00:00:00', end_ts='2023-05-27 01:00:00', status='Failed')
         ]
 
-        cls.mock_session.query.return_value.all.return_value = cls.mock_executions
+    def setUp(self):
+        # Reset mock session for each test
+        self.mock_session.reset_mock()
+
+    def tearDown(self):
+        # Optionally perform cleanup after each test
+        pass
 
     def test_save_execution(self):
         execution = Execution(exec_name="Test Execution", mandate_id=1, asset_class_id=1,
@@ -55,8 +56,11 @@ class TestExecutionDAO(unittest.TestCase):
         self.dao.session.commit.assert_called_once()
 
     def test_get_all_executions(self):
+        self.mock_session.query.return_value.all.return_value = self.mock_executions
+
         executions = self.dao.get_all_executions()
 
+        self.dao.session.query.assert_called_once_with(Execution)
         self.assertEqual(len(executions), 2)
         self.assertEqual(executions[0].exec_name, "Test Execution 1")
         self.assertEqual(executions[1].exec_name, "Test Execution 2")
