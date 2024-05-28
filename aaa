@@ -1,71 +1,23 @@
-import unittest
-from unittest.mock import patch, MagicMock
-from dao.execution_dao import ExecutionDAO
-from models.execution import Execution
+# Assuming you have already set up your test class and mocks
+# Here's how you can correctly mock the query(Execution).filter_by(name=name) call:
 
-class TestExecutionDAO(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.env = {'db_url': 'mock_db_url'}
+# Set up the mock for query and filter_by
+mock_query = self.mock_session.query.return_value
+mock_filter_by = mock_query.filter_by(name=name)
 
-        # Patch the DB2Connector class
-        cls.db_connector_patcher = patch('dao.execution_dao.DB2Connector')
-        cls.mock_db_connector = cls.db_connector_patcher.start()
+# Create a mock Execution object that matches the filter condition
+mock_execution = Execution(id=1, name="Test Execution")
 
-        # Create a MagicMock for the DB2Connector instance
-        cls.mock_db_connector_instance = cls.mock_db_connector.return_value
-        cls.mock_session = MagicMock()
-        cls.mock_db_connector_instance.get_session.return_value = cls.mock_session
+# Set up the behavior of first() to return mock_execution
+mock_filter_by.first.return_value = mock_execution
 
-        # Instantiate the ExecutionDAO with the mocked DB2Connector and env
-        cls.dao = ExecutionDAO(env=cls.env)
+# Call your method under test that uses query(Execution).filter_by(name=name)
+execution = self.dao.get_execution_by_name(name)
 
-        # Set up mock data once for all tests
-        cls.setUpTestData()
+# Assertions to verify the behavior
+self.mock_session.query.assert_called_once_with(Execution)
+mock_query.filter_by.assert_called_once_with(name=name)
+mock_filter_by.first.assert_called_once()
 
-    @classmethod
-    def tearDownClass(cls):
-        cls.db_connector_patcher.stop()
-
-    @classmethod
-    def setUpTestData(cls):
-        # Set up mock data once for all tests
-        cls.mock_executions = [
-            Execution(name="Test Execution 1", mandate_id=1, asset_class_id=1,
-                      start_ts='2023-05-26 00:00:00', end_ts='2023-05-26 01:00:00', status='Completed'),
-            Execution(name="Test Execution 2", mandate_id=2, asset_class_id=2,
-                      start_ts='2023-05-27 00:00:00', end_ts='2023-05-27 01:00:00', status='Failed')
-        ]
-        for execution in cls.mock_executions:
-            execution.id = cls.mock_executions.index(execution) + 1
-
-    def setUp(self):
-        # Reset mock session for each test
-        self.mock_session.reset_mock()
-
-    def tearDown(self):
-        # Optionally perform cleanup after each test
-        pass
-
-    def test_get_execution_by_name(self):
-        name = "Test Execution 2"
-
-        # Mock the query and filter_by
-        mock_query = self.mock_session.query.return_value
-        mock_filter_by = mock_query.filter_by.return_value
-        mock_filter_by.first.return_value = self.mock_executions[1]
-
-        # Call the method under test
-        execution = self.dao.get_execution_by_name(name)
-
-        # Assertions
-        self.mock_session.query.assert_called_once_with(Execution)
-        mock_query.filter_by.assert_called_once_with(name="Test Execution 2")
-        mock_filter_by.first.assert_called_once()
-
-        # Validate the returned execution object
-        self.assertEqual(execution.name, name)
-        self.assertEqual(execution.id, 2)
-
-if __name__ == '__main__':
-    unittest.main()
+# Validate the returned execution object
+self.assertEqual(execution, mock_execution)
