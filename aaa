@@ -3,12 +3,13 @@
 
 # Set up the mock for query and filter_by
 mock_query = self.mock_session.query.return_value
-mock_filter_by = mock_query.filter_by(name=name)
+mock_filter_by = mock_query.filter_by
 
 # Create a mock Execution object that matches the filter condition
 mock_execution = Execution(id=1, name="Test Execution")
 
-# Set up the behavior of first() to return mock_execution
+# Set up the behavior of filter_by to return a new mock object for the filter condition
+mock_filter_by.return_value = mock_filter_by
 mock_filter_by.first.return_value = mock_execution
 
 # Call your method under test that uses query(Execution).filter_by(name=name)
@@ -16,7 +17,7 @@ execution = self.dao.get_execution_by_name(name)
 
 # Assertions to verify the behavior
 self.mock_session.query.assert_called_once_with(Execution)
-mock_query.filter_by.assert_called_once_with(name=name)
+mock_filter_by.assert_called_once_with(name=name)
 mock_filter_by.first.assert_called_once()
 
 # Validate the returned execution object
