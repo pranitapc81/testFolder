@@ -1,24 +1,83 @@
-# Assuming you have already set up your test class and mocks
-# Here's how you can correctly mock the query(Execution).filter_by(name=name) call:
+import unittest
+from unittest.mock import MagicMock
+from sqlalchemy.orm import Session
+from execution_dao import ExecutionDAO, Execution  # Import your DAO class and Execution class
 
-# Set up the mock for query and filter_by
-mock_query = self.mock_session.query.return_value
-mock_filter_by = mock_query.filter_by
 
-# Create a mock Execution object that matches the filter condition
-mock_execution = Execution(id=1, name="Test Execution")
+class TestExecutionDAO(unittest.TestCase):
 
-# Set up the behavior of filter_by to return a new mock object for the filter condition
-mock_filter_by.return_value = mock_filter_by
-mock_filter_by.first.return_value = mock_execution
+    def setUp(self):
+        # Create a mock SQLAlchemy session
+        self.mock_session = MagicMock(spec=Session)
+        
+        # Mock db2connection and assign mock_session as its session attribute
+        self.mock_db2connection = MagicMock()
+        self.mock_db2connection.session = self.mock_session
+        
+        # Initialize ExecutionDAO with the mock db2connection
+        self.dao = ExecutionDAO(self.mock_db2connection)
 
-# Call your method under test that uses query(Execution).filter_by(name=name)
-execution = self.dao.get_execution_by_name(name)
+    def test_save_execution(self):
+        # Test saving an execution
+        execution = Execution(id=1, name="Execution 1", status="completed")
+        self.dao.save_execution(execution)
+        
+        # Assert that session.add() was called with the execution object
+        self.mock_session.add.assert_called_once_with(execution)
 
-# Assertions to verify the behavior
-self.mock_session.query.assert_called_once_with(Execution)
-mock_filter_by.assert_called_once_with(name=name)
-mock_filter_by.first.assert_called_once()
+        # Assert that session.commit() was called once after adding the execution
+        self.mock_session.commit.assert_called_once()
 
-# Validate the returned execution object
-self.assertEqual(execution, mock_execution)
+    def test_get_executions(self):
+        # Test retrieving all executions
+        mock_execution_data = [
+            Execution(id=1, name="Execution 1", status="completed"),
+            Execution(id=2, name="Execution 2", status="pending"),
+        ]
+        
+        # Mock session.query().all() to return mock_execution_data
+        self.mock_session.query().all.return_value = mock_execution_data
+        
+        executions = self.dao.get_executions()
+        
+        # Assert that query().all() was called on session with Execution
+        self.mock_session.query(Execution).all.assert_called_once()
+        
+        # Assert the returned executions match mock_execution_data
+        self.assertEqual(executions, mock_execution_data)
+
+    def test_get_execution_by_id(self):
+        # Test retrieving an execution by ID
+        execution_id = 1
+        mock_execution = Execution(id=execution_id, name="Execution 1", status="completed")
+        
+        # Mock session.query().filter_by().first() to return mock_execution
+        self.mock_session.query().filter_by().first.return_value = mock_execution
+        
+        execution = self.dao.get_execution_by_id(execution_id)
+        
+        # Assert that query().filter_by().first() was called with the correct execution_id
+        self.mock_session.query(Execution).filter_by(id=execution_id).first.assert_called_once()
+        
+        # Assert the returned execution object matches mock_execution
+        self.assertEqual(execution, mock_execution)
+
+    def test_get_execution_by_name(self):
+        # Test retrieving an execution by name
+        execution_name = "Execution 1"
+        mock_execution = Execution(id=1, name=execution_name, status="completed")
+        
+        # Mock session.query().filter_by().first() to return mock_execution
+        self.mock_session.query().filter_by(name=execution_name).first.return_value = mock_execution
+        
+        execution = self.dao.get_execution_by_name(execution_name)
+        
+        # Assert that query().filter_by().first() was called with the correct name parameter
+        self.mock_session.query(Execution).filter_by(name=execution_name).first.assert_called_once()
+        
+        # Assert the returned execution object matches mock_execution
+        self.assertEqual(execution, mock_execution)
+
+
+if __name__ == '__main__':
+    unittest.main()
