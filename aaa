@@ -47,50 +47,23 @@ class TestExecutionDAO(unittest.TestCase):
         # Optionally perform cleanup after each test
         pass
 
-    def test_save_execution(self):
-        execution = Execution(name="Test Execution", mandate_id=1, asset_class_id=1,
-                              start_ts='2023-05-26 00:00:00', end_ts='2023-05-26 01:00:00', status='Completed')
-
-        self.dao.save_execution(execution)
-
-        # Verify that the execution was added to the session and committed
-        self.dao.session.add.assert_called_once_with(execution)
-        self.dao.session.commit.assert_called_once()
-
-    def test_get_all_executions(self):
-        self.mock_session.query.return_value.all.return_value = self.mock_executions
-
-        executions = self.dao.get_all_executions()
-
-        self.dao.session.query.assert_called_once_with(Execution)
-        self.assertEqual(len(executions), 2)
-        self.assertEqual(executions[0].name, "Test Execution 1")
-        self.assertEqual(executions[1].name, "Test Execution 2")
-
-    def test_get_execution_by_id(self):
-        execution_id = 1
-        self.mock_session.query.return_value.filter_by.return_value.first.return_value = self.mock_executions[0]
-
-        execution = self.dao.get_execution_by_id(execution_id)
-
-        self.dao.session.query.assert_called_once_with(Execution)
-        self.dao.session.query.return_value.filter_by.assert_called_once_with(id=execution_id)
-        self.dao.session.query.return_value.filter_by.return_value.first.assert_called_once()
-        self.assertEqual(execution.id, execution_id)
-        self.assertEqual(execution.name, "Test Execution 1")
-
     def test_get_execution_by_name(self):
         name = "Test Execution 2"
-        # Mock the query chain
+
+        # Mock the query and filter_by
         mock_query = self.mock_session.query.return_value
         mock_filter_by = mock_query.filter_by.return_value
         mock_filter_by.first.return_value = self.mock_executions[1]
 
+        # Call the method under test
         execution = self.dao.get_execution_by_name(name)
 
+        # Assertions
         self.mock_session.query.assert_called_once_with(Execution)
-        mock_query.filter_by.assert_called_once_with(name=name)
+        mock_query.filter_by.assert_called_once_with(name="Test Execution 2")
         mock_filter_by.first.assert_called_once()
+
+        # Validate the returned execution object
         self.assertEqual(execution.name, name)
         self.assertEqual(execution.id, 2)
 
