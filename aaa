@@ -36,9 +36,9 @@ class TestExecutionDAO(unittest.TestCase):
     def setUpTestData(cls):
         # Set up mock data once for all tests
         cls.mock_executions = [
-            Execution(exec_name="Test Execution 1", mandate_id=1, asset_class_id=1,
+            Execution(id=1, exec_name="Test Execution 1", mandate_id=1, asset_class_id=1,
                       start_ts='2023-05-26 00:00:00', end_ts='2023-05-26 01:00:00', status='Completed'),
-            Execution(exec_name="Test Execution 2", mandate_id=2, asset_class_id=2,
+            Execution(id=2, exec_name="Test Execution 2", mandate_id=2, asset_class_id=2,
                       start_ts='2023-05-27 00:00:00', end_ts='2023-05-27 01:00:00', status='Failed')
         ]
 
@@ -60,6 +60,30 @@ class TestExecutionDAO(unittest.TestCase):
         self.assertEqual(len(executions), 2)
         self.assertEqual(executions[0].exec_name, "Test Execution 1")
         self.assertEqual(executions[1].exec_name, "Test Execution 2")
+
+    def test_get_execution_by_id(self):
+        execution_id = 1
+        self.mock_session.query.return_value.filter_by.return_value.first.return_value = self.mock_executions[0]
+
+        execution = self.dao.get_execution_by_id(execution_id)
+
+        self.dao.session.query.assert_called_once_with(Execution)
+        self.dao.session.query.return_value.filter_by.assert_called_once_with(id=execution_id)
+        self.dao.session.query.return_value.filter_by.return_value.first.assert_called_once()
+        self.assertEqual(execution.id, execution_id)
+        self.assertEqual(execution.exec_name, "Test Execution 1")
+
+    def test_get_execution_by_name(self):
+        exec_name = "Test Execution 2"
+        self.mock_session.query.return_value.filter_by.return_value.first.return_value = self.mock_executions[1]
+
+        execution = self.dao.get_execution_by_name(exec_name)
+
+        self.dao.session.query.assert_called_once_with(Execution)
+        self.dao.session.query.return_value.filter_by.assert_called_once_with(exec_name=exec_name)
+        self.dao.session.query.return_value.filter_by.return_value.first.assert_called_once()
+        self.assertEqual(execution.exec_name, exec_name)
+        self.assertEqual(execution.id, 2)
 
 if __name__ == '__main__':
     unittest.main()
