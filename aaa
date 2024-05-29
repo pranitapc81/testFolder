@@ -1,110 +1,63 @@
 import unittest
+from datetime import datetime
+from code5 import RulesResolver
 import pandas as pd
-from code5 import TradeDataProcessor
 
-class TestTradeDataProcessor(unittest.TestCase):
+class TestRulesResolver(unittest.TestCase):
     def setUp(self):
-        self.stubbing_file_path = "test_input.xlsx"
-        # Create a sample input Excel file for testing
-        self.create_test_input_file()
-        self.trade_processor = TradeDataProcessor(self.stubbing_file_path)
+        self.rules_df = pd.DataFrame({
+            'RuleID': [101, 102, 103],
+            'Type': ['Numeric', 'String', 'Date'],
+            'Length': [4, 5, 0],
+            'Pattern': ['digits', 'upper', None],
+            'Unit': [None, None, 'days']
+        })
+        self.trade_dict = {
+            1: {101: None, 102: None, 103: None}
+        }
+        self.rules_resolver = RulesResolver(self.trade_dict, self.rules_df)
 
     def tearDown(self):
         pass
 
-    def create_test_input_file(self):
-        # Create a test input Excel file
-        trade_details_data = {
-            'TradeID': [1, 2, 3],
-            'Path': ['path1', 'path2', 'path3'],
-            'Value': [100, 200, 300],
-            'RuleID': [101, 102, 103]
-        }
-        common_fields_data = {
-            'CommonFieldID': [1, 2, 3],
-            'CommonField': ['Field1', 'Field2', 'Field3']
-        }
-        rules_data = {
-            'RuleID': [101, 102, 103],
-            'Type': ['Type1', 'Type2', 'Type3'],
-            'Length': [1, 2, 3],
-            'Pattern': ['Pattern1', 'Pattern2', 'Pattern3'],
-            'Unit': ['Unit1', 'Unit2', 'Unit3']
-        }
-        with pd.ExcelWriter(self.stubbing_file_path) as writer:
-            pd.DataFrame(trade_details_data).to_excel(writer, sheet_name='TradeDetails', index=False)
-            pd.DataFrame(common_fields_data).to_excel(writer, sheet_name='CommonFields', index=False)
-            pd.DataFrame(rules_data).to_excel(writer, sheet_name='Rules', index=False)
+    def test_numeric_rule_resolver(self):
+        generated_output = self.rules_resolver.numeric_rule_resolver(4)
+        # Check if the generated output is numeric
+        self.assertTrue(generated_output.isdigit())
 
-    def test_filter_unique_trade_rows(self):
-        unique_trade_rows_df = self.trade_processor.filter_unique_trade_rows()
-        # Check if the output DataFrame has the expected number of rows
-        self.assertEqual(len(unique_trade_rows_df), 3)
+    def test_string_rule_resolver(self):
+        generated_output = self.rules_resolver.string_rule_resolver(5, 'upper')
+        # Check if the generated output is a string and in uppercase
+        self.assertTrue(generated_output.isalpha())
+        self.assertEqual(generated_output, generated_output.upper())
 
-    def test_generate_new_trade_identifier_df(self):
-        unique_trade_rows_df = pd.DataFrame({
-            'TradeID': [1, 2, 3],
-            'Criteria1': ['A', 'B', 'C'],
-            'Criteria2': ['X', 'Y', 'Z']
-        })
-        new_trade_identifier_df = self.trade_processor.generate_new_trade_identifier_df(unique_trade_rows_df)
-        # Check if the output DataFrame has the expected number of rows
-        self.assertEqual(len(new_trade_identifier_df), 9)  # 3 unique trades * 3 common rows
+    def test_alphanumeric_rule_resolver(self):
+        generated_output = self.rules_resolver.alphanumeric_rule_resolver(5, 'lower')
+        # Check if the generated output is alphanumeric and in lowercase
+        self.assertTrue(generated_output.isalnum())
+        self.assertEqual(generated_output, generated_output.lower())
 
-    def test_generate_stub_trades_with_identifiers_df(self):
-        stubbed_trades_with_identifiers_df = self.trade_processor.generate_stub_trades_with_identifiers_df()
-        # Check if the output DataFrame has the expected number of rows
-        self.assertEqual(len(stubbed_trades_with_identifiers_df), 12)  # 3 original trades + 3 new identifiers
+    def test_date_rule_resolver(self):
+        generated_output = self.rules_resolver.date_rule_resolver(None, None, 'days')
+        # Check if the generated output is a valid date string
+        self.assertTrue(isinstance(datetime.strptime(generated_output, '%d-%m-%Y'), datetime))
 
-    def test_create_trade_id_rule_mappings(self):
-        trade_df = pd.DataFrame({
-            'TradeID': [1, 2, 3, 4],
-            'RuleID': [101, 102, 103, 102]
-        })
-        trade_id_rules_dict = self.trade_processor.create_trade_id_rule_mappings(trade_df)
-        # Check if the trade ID rule mappings are created correctly
-        self.assertEqual(trade_id_rules_dict[1], {101: None})
-        self.assertEqual(trade_id_rules_dict[2], {102: None})
-        self.assertEqual(trade_id_rules_dict[3], {103: None})
-        self.assertEqual(trade_id_rules_dict[4], {102: None})
+    def test_resolve_rule(self):
+        generated_output = self.rules_resolver.resolve_rule(101)
+        # Check if the generated output is numeric
+        self.assertTrue(generated_output.isdigit())
 
-    def test_update_trade_df_with_rules_dict(self):
-        trade_df = pd.DataFrame({
-            'TradeID': [1, 2, 3, 4],
-            'RuleID': [101, 102, 103, 102],
-            'Value': [100, 200, 300, 400]
-        })
-        rules_dict = {
-            1: {101: '1000'},
-            2: {102: '2000'},
-            3: {103: '3000'},
-            4: {102: '2000'}
-        }
-        updated_trade_df = self.trade_processor.update_trade_df_with_rules_dict(trade_df, rules_dict)
-        # Check if the trade DataFrame is updated correctly with the rules dictionary
-        self.assertEqual(updated_trade_df.at[0, 'Value'], '1000')
-        self.assertEqual(updated_trade_df.at[2, 'Value'], '3000')
-
-    def test_map_generated_id_with_trades(self):
-        df = pd.DataFrame({
-            'TradeID': [1, 2, 3],
-            'IsTradeID': ['Y', 'N', 'Y'],
-            'Value': ['A', 'B', 'C']
-        })
-        trade_dict = self.trade_processor.map_generated_id_with_trades(df)
-        # Check if the trade dictionary is generated correctly
-        self.assertEqual(trade_dict, {1: 'A', 3: 'C'})
-
-    def test_add_generated_trade_id(self):
-        df = pd.DataFrame({
-            'TradeID': [1, 2, 3],
-            'GeneratedTradeID': [None, None, None]
-        })
-        trade_dict = {1: 'A', 3: 'C'}
-        updated_df = self.trade_processor.add_generated_trade_id(df, trade_dict)
-        # Check if the generated trade IDs are added correctly to the DataFrame
-        self.assertEqual(updated_df.at[0, 'GeneratedTradeID'], 'A')
-        self.assertEqual(updated_df.at[2, 'GeneratedTradeID'], 'C')
+    def test_resolve_rules(self):
+        resolved_trade_dict = self.rules_resolver.resolve_rules()
+        # Check if the resolved trade dictionary contains valid values
+        for trade_id, rule_dict in resolved_trade_dict.items():
+            for rule_id, rule_value in rule_dict.items():
+                if rule_id == 101:
+                    self.assertTrue(rule_value.isdigit())
+                elif rule_id == 102:
+                    self.assertTrue(rule_value.isalpha())
+                elif rule_id == 103:
+                    self.assertTrue(isinstance(datetime.strptime(rule_value, '%d-%m-%Y'), datetime))
 
 if __name__ == "__main__":
     unittest.main()
