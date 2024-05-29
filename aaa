@@ -1,63 +1,25 @@
-import unittest
-from datetime import datetime
-from code5 import RulesResolver
-import pandas as pd
+123	a/b/c		1	a1	a2	a3
+123	b/c/d		1	a1	a2	a4
+123	e/r/t		2	a1	a2	ae
+123	q/w/e		2	s1	s2	s3
+123	d/f/g	Test123		s1	s2	s3
+123	b/n/m		3	s2	s2	s3
+456	a/b/c		1	a1	a2	a3
+456	b/c/d		1	a1	a2	a4
+456	e/r/t		2	a1	a2	ae
+456	q/w/e		2	s1	s2	s3
+456	d/f/g	Test456		s1	s2	s3
+456	b/n/m		4	s2	s2	s3
 
-class TestRulesResolver(unittest.TestCase):
-    def setUp(self):
-        self.rules_df = pd.DataFrame({
-            'RuleID': [101, 102, 103],
-            'Type': ['Numeric', 'String', 'Date'],
-            'Length': [4, 5, 0],
-            'Pattern': ['digits', 'upper', None],
-            'Unit': [None, None, 'days']
-        })
-        self.trade_dict = {
-            1: {101: None, 102: None, 103: None}
-        }
-        self.rules_resolver = RulesResolver(self.trade_dict, self.rules_df)
 
-    def tearDown(self):
-        pass
 
-    def test_numeric_rule_resolver(self):
-        generated_output = self.rules_resolver.numeric_rule_resolver(4)
-        # Check if the generated output is numeric
-        self.assertTrue(generated_output.isdigit())
+RuleID	Length	Pattern	Unit	Type	IsTradeID
+1	4			Numeric	Y
+2	5	upper		String	
+3	6	lower		AlphaNumeric	
+4		%d-%m-%Y		Date	
 
-    def test_string_rule_resolver(self):
-        generated_output = self.rules_resolver.string_rule_resolver(5, 'upper')
-        # Check if the generated output is a string and in uppercase
-        self.assertTrue(generated_output.isalpha())
-        self.assertEqual(generated_output, generated_output.upper())
 
-    def test_alphanumeric_rule_resolver(self):
-        generated_output = self.rules_resolver.alphanumeric_rule_resolver(5, 'lower')
-        # Check if the generated output is alphanumeric and in lowercase
-        self.assertTrue(generated_output.isalnum())
-        self.assertEqual(generated_output, generated_output.lower())
-
-    def test_date_rule_resolver(self):
-        generated_output = self.rules_resolver.date_rule_resolver(None, None, 'days')
-        # Check if the generated output is a valid date string
-        self.assertTrue(isinstance(datetime.strptime(generated_output, '%d-%m-%Y'), datetime))
-
-    def test_resolve_rule(self):
-        generated_output = self.rules_resolver.resolve_rule(101)
-        # Check if the generated output is numeric
-        self.assertTrue(generated_output.isdigit())
-
-    def test_resolve_rules(self):
-        resolved_trade_dict = self.rules_resolver.resolve_rules()
-        # Check if the resolved trade dictionary contains valid values
-        for trade_id, rule_dict in resolved_trade_dict.items():
-            for rule_id, rule_value in rule_dict.items():
-                if rule_id == 101:
-                    self.assertTrue(rule_value.isdigit())
-                elif rule_id == 102:
-                    self.assertTrue(rule_value.isalpha())
-                elif rule_id == 103:
-                    self.assertTrue(isinstance(datetime.strptime(rule_value, '%d-%m-%Y'), datetime))
-
-if __name__ == "__main__":
-    unittest.main()
+Path	Value	RuleID	IsTradeID
+d/f/d	qq		
+e/r/t		2	Y
