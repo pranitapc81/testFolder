@@ -1,5 +1,27 @@
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, Integer, String
+
+Base = declarative_base()
+
+class TradeStub(Base):
+    __tablename__ = 'TRADE_STUB'
+    ID = Column(Integer, primary_key=True)
+    TRADE_ID = Column(Integer)
+    VERSION = Column(Integer)
+    MESSAGE = Column(String)
+    ORDER = Column(Integer)
+
+class StubbedAttribute(Base):
+    __tablename__ = 'STUBBED_ATTRIBUTE'
+    ATTRIBUTE_ID = Column(Integer, primary_key=True)
+    TRADE_STUB_ID = Column(Integer)
+    KEY = Column(String)
+    VALUE = Column(String)
+    GROUP_ID = Column(Integer)
+
+
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 class TradeMatcher:
@@ -16,17 +38,15 @@ class TradeMatcher:
     def query_trade_stubs(self, unique_trade_ids):
         session = self.Session()
         try:
-            query = text("SELECT * FROM TRADE_STUB WHERE TRADE_ID IN :trade_ids")
-            self.trade_stubs = pd.read_sql(query.bindparams(trade_ids=tuple(unique_trade_ids)), session.bind)
+            self.trade_stubs = session.query(TradeStub).filter(TradeStub.TRADE_ID.in_(unique_trade_ids)).all()
         finally:
             session.close()
 
     def query_stubbed_attributes(self):
-        unique_trade_stub_ids = self.trade_stubs['ID'].unique()
+        unique_trade_stub_ids = [trade_stub.ID for trade_stub in self.trade_stubs]
         session = self.Session()
         try:
-            query = text("SELECT * FROM STUBBED_ATTRIBUTE WHERE TRADE_STUB_ID IN :trade_stub_ids")
-            self.stubbed_attributes = pd.read_sql(query.bindparams(trade_stub_ids=tuple(unique_trade_stub_ids)), session.bind)
+            self.stubbed_attributes = session.query(StubbedAttribute).filter(StubbedAttribute.TRADE_STUB_ID.in_(unique_trade_stub_ids)).all()
         finally:
             session.close()
 
@@ -42,28 +62,29 @@ class TradeMatcher:
             trade_id = row['TradeID']
             
             # Filter trade_stubs for the current TradeID
-            matching_stubs = self.trade_stubs[self.trade_stubs['TRADE_ID'] == trade_id]
+            matching_stubs = [stub for stub in self.trade_stubs if stub.TRADE_ID == trade_id]
             
             # Flag to track if a match is found
             match_found = False
             
-            for _, stub in matching_stubs.iterrows():
-                trade_stub_id = stub['ID']
+            for stub in matching_stubs:
+                trade_stub_id = stub.ID
                 
                 # Filter attributes for the current trade_stub_id
-                matching_attributes = self.stubbed_attributes[self.stubbed_attributes['TRADE_STUB_ID'] == trade_stub_id]
+                matching_attributes = [attr for attr in self.stubbed_attributes if attr.TRADE_STUB_ID == trade_stub_id]
                 
                 # Create a dictionary of attributes to match
                 row_attributes = row[attribute_columns].to_dict()
                 
                 # Check if all attributes match within the same GROUP_ID
-                for group_id in matching_attributes['GROUP_ID'].unique():
-                    group_attributes = matching_attributes[matching_attributes['GROUP_ID'] == group_id]
+                group_ids = {attr.GROUP_ID for attr in matching_attributes}
+                
+                for group_id in group_ids:
+                    group_attributes = [attr for attr in matching_attributes if attr.GROUP_ID == group_id]
                     
                     match = all(
-                        group_attributes[(group_attributes['KEY'] == key) & (group_attributes['VALUE'] == value)].shape[0] > 0
+                        any(attr.KEY == key and attr.VALUE == value for attr in group_attributes)
                         for key, value in row_attributes.items()
-                        if key in group_attributes['KEY'].values
                     )
                     
                     if match:
