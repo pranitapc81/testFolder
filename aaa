@@ -1,56 +1,42 @@
-import pandas as pd
-
-def create_query(df):
-    query = """
 WITH expected_attributes AS (
-    {}
+    SELECT 456 AS tradeid, 'Col1' AS attribute_key, 'a1' AS att_value
+    UNION ALL SELECT 456, 'Col2', 'a2'
+    UNION ALL SELECT 456, 'Col3', 'a3'
+    UNION ALL SELECT 456, 'Col3', 'a4'
+    UNION ALL SELECT 456, 'Col3', 'ae'
+    UNION ALL SELECT 456, 'Col1', 's1'
+    UNION ALL SELECT 456, 'Col2', 's2'
+    UNION ALL SELECT 456, 'Col3', 's3'
+    UNION ALL SELECT 123, 'Col1', 'a1'
+    UNION ALL SELECT 123, 'Col2', 'a2'
+    UNION ALL SELECT 123, 'Col3', 'a3'
+    UNION ALL SELECT 123, 'Col3', 'a4'
+    UNION ALL SELECT 111, 'ColQ', '34'
+    UNION ALL SELECT 111, 'CCC', 'abc'
 )
 SELECT 
-    s.tradeid,
-    s.order,
-    s.message,
-    s.stub_trade_id,
-    a.group_id,
+    ts.TRADE_ID,
+    ts.ORDER,
+    ts.MESSAGE,
+    ts.ID AS trade_stub_id,
+    sa.GROUP_ID,
     ea.attribute_key,
     ea.att_value,
     CASE 
-        WHEN a.attribute_key IS NULL THEN 'No Match'
+        WHEN sa.KEY IS NULL THEN 'No Match'
         ELSE 'Match'
     END AS match_status
 FROM 
-    stubbed_trade s
+    TRADE_STUB ts
 JOIN
     expected_attributes ea
 ON
-    s.tradeid = ea.tradeid
+    ts.TRADE_ID = ea.tradeid
 LEFT JOIN 
-    additional_attr a
+    STUBBED_ATTRIBUTE sa
 ON 
-    s.stub_trade_id = a.stub_trade_id
-    AND ea.attribute_key = a.attribute_key
-    AND ea.att_value = a.att_value
+    ts.ID = sa.TRADE_STUB_ID
+    AND ea.attribute_key = sa.KEY
+    AND ea.att_value = sa.VALUE
 ORDER BY 
-    s.tradeid, s.order, a.group_id, ea.attribute_key;
-    """
-
-    attributes = []
-    for index, row in df.iterrows():
-        for col in df.columns[1:]:  # skip the 'TradeID' column
-            attributes.append(f" UNION ALL SELECT {row['TradeID']}, '{col}', '{row[col]}'")
-
-    attribute_query = "SELECT {} AS tradeid, '{}' AS attribute_key, '{}' AS att_value".format(df.columns[0], df.columns[1], df.iloc[0, 1])
-    attribute_query += "".join(attributes)
-
-    query = query.format(attribute_query)
-
-    return query
-
-df = pd.DataFrame({
-    'TradeID': [456, 456, 456, 456, 123, 123, 123, 111, 111],
-    'Col1': ['a1', 'a1', 'a1', 's1', 'a1', 'a1', 'a1', '34', 'abc'],
-    'Col2': ['a2', 'a2', 'a2', 's2', 'a2', 'a2', 'a2', None, None],
-    'Col3': ['a3', 'a4', 'ae', 's3', 'a3', 'a4', 'ae', None, None]
-})
-
-query = create_query(df)
-print(query)
+    ts.TRADE_ID, ts.ORDER, sa.GROUP_ID, ea.attribute_key;
