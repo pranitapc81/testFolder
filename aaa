@@ -1,10 +1,12 @@
 import pandas as pd
 from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 
 class TradeMatcher:
     def __init__(self, df, db_connection_string):
         self.df = df
         self.engine = create_engine(db_connection_string)
+        self.Session = sessionmaker(bind=self.engine)
         self.trade_stubs = None
         self.stubbed_attributes = None
 
@@ -12,13 +14,21 @@ class TradeMatcher:
         return self.df['TradeID'].unique()
 
     def query_trade_stubs(self, unique_trade_ids):
-        trade_stub_query = text("SELECT * FROM TRADE_STUB WHERE TRADE_ID IN :trade_ids")
-        self.trade_stubs = pd.read_sql(trade_stub_query.bindparams(trade_ids=tuple(unique_trade_ids)), self.engine)
+        session = self.Session()
+        try:
+            query = text("SELECT * FROM TRADE_STUB WHERE TRADE_ID IN :trade_ids")
+            self.trade_stubs = pd.read_sql(query.bindparams(trade_ids=tuple(unique_trade_ids)), session.bind)
+        finally:
+            session.close()
 
     def query_stubbed_attributes(self):
         unique_trade_stub_ids = self.trade_stubs['ID'].unique()
-        stubbed_attribute_query = text("SELECT * FROM STUBBED_ATTRIBUTE WHERE TRADE_STUB_ID IN :trade_stub_ids")
-        self.stubbed_attributes = pd.read_sql(stubbed_attribute_query.bindparams(trade_stub_ids=tuple(unique_trade_stub_ids)), self.engine)
+        session = self.Session()
+        try:
+            query = text("SELECT * FROM STUBBED_ATTRIBUTE WHERE TRADE_STUB_ID IN :trade_stub_ids")
+            self.stubbed_attributes = pd.read_sql(query.bindparams(trade_stub_ids=tuple(unique_trade_stub_ids)), session.bind)
+        finally:
+            session.close()
 
     def match_attributes(self):
         # Add columns to DataFrame
