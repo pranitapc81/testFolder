@@ -1,40 +1,56 @@
 import pandas as pd
 
-def clean_dataframe(df):
+def create_query(df):
+    query = """
+WITH expected_attributes AS (
+    {}
+)
+SELECT 
+    s.tradeid,
+    s.order,
+    s.message,
+    s.stub_trade_id,
+    a.group_id,
+    ea.attribute_key,
+    ea.att_value,
+    CASE 
+        WHEN a.attribute_key IS NULL THEN 'No Match'
+        ELSE 'Match'
+    END AS match_status
+FROM 
+    stubbed_trade s
+JOIN
+    expected_attributes ea
+ON
+    s.tradeid = ea.tradeid
+LEFT JOIN 
+    additional_attr a
+ON 
+    s.stub_trade_id = a.stub_trade_id
+    AND ea.attribute_key = a.attribute_key
+    AND ea.att_value = a.att_value
+ORDER BY 
+    s.tradeid, s.order, a.group_id, ea.attribute_key;
     """
-    This function removes specific columns and drops duplicate rows from the DataFrame.
-    
-    Parameters:
-    df (pd.DataFrame): The input DataFrame to be cleaned.
-    
-    Returns:
-    pd.DataFrame: The cleaned DataFrame with specified columns removed and duplicates dropped.
-    """
-    # Columns to be removed
-    columns_to_remove = ['Path', 'Value', 'RuleID', 'GeneratedTradeID']
-    
-    # Remove the specified columns if they exist in the DataFrame
-    df_cleaned = df.drop(columns=[col for col in columns_to_remove if col in df.columns])
-    
-    # Drop duplicate rows
-    df_cleaned = df_cleaned.drop_duplicates()
-    
-    return df_cleaned
 
-# Sample DataFrame for demonstration
-data = {
-    'Column1': [1, 2, 3, 2],
-    'Path': ['A', 'B', 'C', 'B'],
-    'Value': [10, 20, 30, 20],
-    'RuleID': [100, 200, 300, 200],
-    'GeneratedTradeID': [1000, 2000, 3000, 2000],
-    'Column2': ['X', 'Y', 'Z', 'Y']
-}
+    attributes = []
+    for index, row in df.iterrows():
+        for col in df.columns[1:]:  # skip the 'TradeID' column
+            attributes.append(f" UNION ALL SELECT {row['TradeID']}, '{col}', '{row[col]}'")
 
-df = pd.DataFrame(data)
+    attribute_query = "SELECT {} AS tradeid, '{}' AS attribute_key, '{}' AS att_value".format(df.columns[0], df.columns[1], df.iloc[0, 1])
+    attribute_query += "".join(attributes)
 
-# Use the function to clean the DataFrame
-df_cleaned = clean_dataframe(df)
+    query = query.format(attribute_query)
 
-# Display the cleaned DataFrame
-print(df_cleaned)
+    return query
+
+df = pd.DataFrame({
+    'TradeID': [456, 456, 456, 456, 123, 123, 123, 111, 111],
+    'Col1': ['a1', 'a1', 'a1', 's1', 'a1', 'a1', 'a1', '34', 'abc'],
+    'Col2': ['a2', 'a2', 'a2', 's2', 'a2', 'a2', 'a2', None, None],
+    'Col3': ['a3', 'a4', 'ae', 's3', 'a3', 'a4', 'ae', None, None]
+})
+
+query = create_query(df)
+print(query)
