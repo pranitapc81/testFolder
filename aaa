@@ -1,119 +1,82 @@
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String
-
-Base = declarative_base()
-
-class TradeStub(Base):
-    __tablename__ = 'TRADE_STUB'
-    ID = Column(Integer, primary_key=True)
-    TRADE_ID = Column(Integer)
-    VERSION = Column(Integer)
-    MESSAGE = Column(String)
-    ORDER = Column(Integer)
-
-class StubbedAttribute(Base):
-    __tablename__ = 'STUBBED_ATTRIBUTE'
-    ATTRIBUTE_ID = Column(Integer, primary_key=True)
-    TRADE_STUB_ID = Column(Integer)
-    KEY = Column(String)
-    VALUE = Column(String)
-    GROUP_ID = Column(Integer)
-
-
+from code5 import TradeDataProcessor
+# from sqlalchemy import create_engine, Column, Integer, String, MetaData, Table
+# from sqlalchemy.orm import sessionmaker
+# from sqlalchemy.ext.declarative import declarative_base
 import pandas as pd
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
-class TradeMatcher:
-    def __init__(self, df, db_connection_string):
-        self.df = df
-        self.engine = create_engine(db_connection_string)
-        self.Session = sessionmaker(bind=self.engine)
-        self.trade_stubs = None
-        self.stubbed_attributes = None
+# Example DB2 connection string (replace with your actual DB2 connection string)
+db2_connection_string = 'db2+ibm_db://user:password@hostname:port/database'
 
-    def get_unique_trade_ids(self):
-        return self.df['TradeID'].unique()
+# Create SQLAlchemy engine and session
+# engine = create_engine(db2_connection_string)
+# Session = sessionmaker(bind=engine)
+# session = Session()
 
-    def query_trade_stubs(self, unique_trade_ids):
-        session = self.Session()
-        try:
-            self.trade_stubs = session.query(TradeStub).filter(TradeStub.TRADE_ID.in_(unique_trade_ids)).all()
-        finally:
-            session.close()
+# Base class for ORM mapping
+# Base = declarative_base()
+import pandas as pd
+import numpy as np
 
-    def query_stubbed_attributes(self):
-        unique_trade_stub_ids = [trade_stub.ID for trade_stub in self.trade_stubs]
-        session = self.Session()
-        try:
-            self.stubbed_attributes = session.query(StubbedAttribute).filter(StubbedAttribute.TRADE_STUB_ID.in_(unique_trade_stub_ids)).all()
-        finally:
-            session.close()
 
-    def match_attributes(self):
-        # Add columns to DataFrame
-        self.df['trade_stub_id'] = None
-        self.df['match_status'] = 'no match'
+# class TradeStub(Base):
+#     __tablename__ = 'trade_stub'
+#
+#     id = Column(Integer, primary_key=True)
+#     trade_id = Column(Integer)
+#     # Add more columns as needed
+#
+#     def __repr__(self):
+#         return f"<TradeStub(id={self.id}, trade_id={self.trade_id})>"
 
-        # Identify attribute columns dynamically (excluding 'TradeID' and newly added columns)
-        attribute_columns = self.df.columns.difference(['TradeID', 'trade_stub_id', 'match_status'])
+class TradeDataManager:
+    def __init__(self):
+        pass
 
-        for index, row in self.df.iterrows():
-            trade_id = row['TradeID']
-            
-            # Filter trade_stubs for the current TradeID
-            matching_stubs = [stub for stub in self.trade_stubs if stub.TRADE_ID == trade_id]
-            
-            # Flag to track if a match is found
-            match_found = False
-            
-            for stub in matching_stubs:
-                trade_stub_id = stub.ID
-                
-                # Filter attributes for the current trade_stub_id
-                matching_attributes = [attr for attr in self.stubbed_attributes if attr.TRADE_STUB_ID == trade_stub_id]
-                
-                # Create a dictionary of attributes to match
-                row_attributes = row[attribute_columns].to_dict()
-                
-                # Check if all attributes match within the same GROUP_ID
-                group_ids = {attr.GROUP_ID for attr in matching_attributes}
-                
-                for group_id in group_ids:
-                    group_attributes = [attr for attr in matching_attributes if attr.GROUP_ID == group_id]
-                    
-                    match = all(
-                        any(attr.KEY == key and attr.VALUE == value for attr in group_attributes)
-                        for key, value in row_attributes.items()
-                    )
-                    
-                    if match:
-                        self.df.at[index, 'trade_stub_id'] = trade_stub_id
-                        self.df.at[index, 'match_status'] = 'match'
-                        match_found = True
-                        break
-                
-                if match_found:
-                    break
+    # self.session = env
 
-    def run(self):
-        unique_trade_ids = self.get_unique_trade_ids()
-        self.query_trade_stubs(unique_trade_ids)
-        self.query_stubbed_attributes()
-        self.match_attributes()
-        return self.df
+    def get_trades_with_filter_criteria(self, processed_trades_df):
+        exclude_columns = ['TradeID', 'GeneratedTradeID']
+        mask = processed_trades_df.drop(columns=exclude_columns).apply(
+            lambda x: x.notna().any() or x.astype(str).str.strip().ne('').any(), axis=1)
+        trades_with_filter_criteria_df = processed_trades_df[mask]
+        fixed_columns = ['Path', 'Value', 'RuleID', 'IsTradeID', 'GeneratedTradeID']
+        trades_with_filter_criteria_df = trades_with_filter_criteria_df.drop(columns=fixed_columns).drop_duplicates()
 
-# Usage
-data = {
-    'TradeID': [456, 456, 456, 456, 123, 123, 123, 789, 333, 555],
-    'Col1': ['a1', 'a1', 'a1', 's1', 'a1', 'a1', 'a1', '', '1', 'ww'],
-    'Col2': ['a2', 'a2', 'a2', 's2', 'a2', 'a2', 'a2', '', '', '3e'],
-    'Col3': ['a3', 'a4', 'ae', 's3', 'a3', 'a4', 'ae', '', '', '']
-}
-df = pd.DataFrame(data)
-db_connection_string = 'mysql+pymysql://username:password@host/database'
+        return trades_with_filter_criteria_df
 
-matcher = TradeMatcher(df, db_connection_string)
-result_df = matcher.run()
+    def get_unique_tradeids(self, trades_df):
+        unique_tradeids = trades_df['TradeID'].unique()
+        return unique_tradeids
 
-print(result_df)
+    # def fetch_trade_stub_data(self):
+    #     unique_tradeids = self.get_unique_tradeids()
+    #
+    #     # Query using SQLAlchemy ORM
+    #     query = self.db_session.query(TradeStub).filter(TradeStub.trade_id.in_(unique_tradeids))
+    #
+    #     # Execute query and fetch results into DataFrame
+    #     trade_stub_data = pd.read_sql(query.statement, self.db_session.bind)
+    #
+    #     return trade_stub_data
+
+
+# Sample usage
+if __name__ == "__main__":
+    # Sample DataFrame
+    stubbing_file_path = "input.xlsx"
+    trade_processor = TradeDataProcessor(stubbing_file_path)
+    df = trade_processor.generate_stubbing_result()
+    print(df)
+
+    # Display the original DataFrame
+    print("Original DataFrame:")
+    print(df)
+
+    # Initialize the DataFrameCleaner class with the DataFrame
+    cleaner = TradeDataManager()
+
+    cleaned_df = cleaner.get_trades_with_filter_criteria(df)
+
+    # Display the cleaned DataFrame
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
