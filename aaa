@@ -1,21 +1,54 @@
-class DataLoader:
-    def __init__(self, file_path):
-        self.file_path = file_path
+class TestcaseBuilder:
+    def __init__(self):
+        self.testcase_id = None
+        self.name = None
+        self.active = None
+        self.version = None
+        self.type = None
+        self.scenario_id = None
+        self.product_type = None
+        self.event_type = None
 
-    def load_all_data(self):
-        # Load scenarios
-        scenarios = ScenarioLoader.load(self.file_path)
-        ScenarioService.load_scenarios(scenarios)
+    def set_testcase_id(self, testcase_id):
+        self.testcase_id = testcase_id
+        return self
 
-        # Load test cases
-        testcases = TestcaseLoader.load(self.file_path)
-        TestcaseService.load_testcases(testcases)
+    def set_name(self, name):
+        self.name = name
+        return self
 
-        # Load fields
-        fields = FieldLoader.load(self.file_path)
-        FieldService.load_fields(fields)
+    def set_active(self, active):
+        self.active = active
+        return self
 
-if __name__ == "__main__":
-    excel_file_path = 'path_to_your_excel_file.xlsx'  # Replace with your actual file path
-    data_loader = DataLoader(excel_file_path)
-    data_loader.load_all_data()
+    def set_version(self, version):
+        self.version = version
+        return self
+
+    def set_type(self, type):
+        self.type = type
+        return self
+
+    def set_scenario_id(self, scenario_id):
+        self.scenario_id = scenario_id
+        return self
+
+    def set_product_type(self, product_type):
+        self.product_type = product_type
+        return self
+
+    def set_event_type(self, event_type):
+        self.event_type = event_type
+        return self
+
+    def build(self):
+        return Testcase(
+            self.testcase_id,
+            self.name,
+            self.active,
+            self.version,
+            self.type,
+            self.scenario_id,
+            self.product_type,
+            self.event_type
+        )
