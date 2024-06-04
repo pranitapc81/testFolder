@@ -1,38 +1,61 @@
-class Scenario:
-    def __init__(self, scenario_id, name, type, active, scenario_pack_id):
-        self._scenario_id = scenario_id
-        self._name = name
-        self._type = type
-        self._active = active
-        self._scenario_pack_id = scenario_pack_id
+from sqlalchemy import create_engine, Column, String, Boolean
+from sqlalchemy.ext.declarative import declarative_base
+import uuid
 
-    @property
-    def scenario_id(self):
-        return self._scenario_id
+Base = declarative_base()
 
-    @property
-    def name(self):
-        return self._name
+class Scenario(Base):
+    __tablename__ = 'scenarios'
 
-    @property
-    def type(self):
-        return self._type
-
-    @property
-    def active(self):
-        return self._active
-
-    @property
-    def scenario_pack_id(self):
-        return self._scenario_pack_id
+    scenario_id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String)
+    type = Column(String)
+    active = Column(Boolean)
+    scenario_pack_id = Column(String)
 
     def __repr__(self):
         return (f"Scenario(ID={self.scenario_id}, Name={self.name}, Type={self.type}, "
                 f"Active={self.active}, Scenario Pack ID={self.scenario_pack_id})")
 
+    @property
+    def scenario_id(self):
+        return self._scenario_id
 
+    @scenario_id.setter
+    def scenario_id(self, value):
+        self._scenario_id = value
 
-import uuid
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, value):
+        self._name = value
+
+    @property
+    def type(self):
+        return self._type
+
+    @type.setter
+    def type(self, value):
+        self._type = value
+
+    @property
+    def active(self):
+        return self._active
+
+    @active.setter
+    def active(self, value):
+        self._active = value
+
+    @property
+    def scenario_pack_id(self):
+        return self._scenario_pack_id
+
+    @scenario_pack_id.setter
+    def scenario_pack_id(self, value):
+        self._scenario_pack_id = value
 
 class ScenarioBuilder:
     def __init__(self):
@@ -64,116 +87,64 @@ class ScenarioBuilder:
 
     def build(self):
         return Scenario(
-            self._scenario_id,
-            self._name,
-            self._type,
-            self._active,
-            self._scenario_pack_id
+            scenario_id=self._scenario_id,
+            name=self._name,
+            type=self._type,
+            active=self._active,
+            scenario_pack_id=self._scenario_pack_id
         )
 
+class TestcaseBuilder:
+    def __init__(self):
+        self._testcase_id = None
+        self._name = None
+        self._active = None
+        self._version = None
+        self._type = None
+        self._scenario_id = None
+        self._product_type = None
+        self._event_type = None
 
+    def set_testcase_id(self, testcase_id=None):
+        self._testcase_id = testcase_id if testcase_id is not None else str(uuid.uuid4())
+        return self
 
-import unittest
-from your_module import Scenario, Testcase, Field, ScenarioBuilder, TestcaseBuilder, ScenarioLoader, TestcaseLoader, FieldLoader
-import pandas as pd
-from io import BytesIO
+    def set_name(self, name):
+        self._name = name
+        return self
 
-class TestScenarioBuilder(unittest.TestCase):
-    def test_scenario_builder(self):
-        scenario = (ScenarioBuilder()
-                    .set_scenario_id('12345')
-                    .set_name('Test Scenario')
-                    .set_type('Functional')
-                    .set_active(True)
-                    .set_scenario_pack_id('54321')
-                    .build())
+    def set_active(self, active):
+        self._active = active
+        return self
 
-        self.assertEqual(scenario.scenario_id, '12345')
-        self.assertEqual(scenario.name, 'Test Scenario')
-        self.assertEqual(scenario.type, 'Functional')
-        self.assertEqual(scenario.active, True)
-        self.assertEqual(scenario.scenario_pack_id, '54321')
+    def set_version(self, version):
+        self._version = version
+        return self
 
-class TestTestcaseBuilder(unittest.TestCase):
-    def test_testcase_builder(self):
-        testcase = (TestcaseBuilder()
-                    .set_testcase_id('12345')
-                    .set_name('Test Case')
-                    .set_active(True)
-                    .set_version('1.0')
-                    .set_type('Regression')
-                    .set_scenario_id('54321')
-                    .set_product_type('ProductA')
-                    .set_event_type('EventA')
-                    .build())
+    def set_type(self, type):
+        self._type = type
+        return self
 
-        self.assertEqual(testcase.testcase_id, '12345')
-        self.assertEqual(testcase.name, 'Test Case')
-        self.assertEqual(testcase.active, True)
-        self.assertEqual(testcase.version, '1.0')
-        self.assertEqual(testcase.type, 'Regression')
-        self.assertEqual(testcase.scenario_id, '54321')
-        self.assertEqual(testcase.product_type, 'ProductA')
-        self.assertEqual(testcase.event_type, 'EventA')
+    def set_scenario_id(self, scenario_id):
+        self._scenario_id = scenario_id
+        return self
 
-class TestLoader(unittest.TestCase):
-    def setUp(self):
-        # Create a dummy Excel file in memory
-        self.file_content = BytesIO()
-        writer = pd.ExcelWriter(self.file_content, engine='openpyxl')
+    def set_product_type(self, product_type):
+        self._product_type = product_type
+        return self
 
-        scenario_data = {
-            'id': ['1', '2'],
-            'name': ['Scenario 1', 'Scenario 2'],
-            'type': ['Functional', 'Performance'],
-            'active': [True, False],
-            'scenario_pack_id': ['100', '200']
-        }
-        scenario_df = pd.DataFrame(scenario_data)
-        scenario_df.to_excel(writer, sheet_name='scenario', index=False)
+    def set_event_type(self, event_type):
+        self._event_type = event_type
+        return self
 
-        testcase_data = {
-            'id': ['1', '2'],
-            'name': ['Testcase 1', 'Testcase 2'],
-            'active': [True, False],
-            'version': ['1.0', '2.0'],
-            'type': ['Regression', 'Smoke'],
-            'scenario_id': ['1', '2'],
-            'product_type': ['ProductA', 'ProductB'],
-            'event_type': ['EventA', 'EventB']
-        }
-        testcase_df = pd.DataFrame(testcase_data)
-        testcase_df.to_excel(writer, sheet_name='testcase', index=False)
-
-        field_data = {
-            'id': ['1', '2'],
-            'name': ['Field 1', 'Field 2'],
-            'qwest_type': ['TypeA', 'TypeB'],
-            'active': [True, False]
-        }
-        field_df = pd.DataFrame(field_data)
-        field_df.to_excel(writer, sheet_name='field', index=False)
-
-        writer.save()
-        self.file_content.seek(0)
-
-    def test_scenario_loader(self):
-        scenarios = ScenarioLoader.load(self.file_content)
-        self.assertEqual(len(scenarios), 2)
-        self.assertEqual(scenarios[0].name, 'Scenario 1')
-        self.assertEqual(scenarios[1].name, 'Scenario 2')
-
-    def test_testcase_loader(self):
-        testcases = TestcaseLoader.load(self.file_content)
-        self.assertEqual(len(testcases), 2)
-        self.assertEqual(testcases[0].name, 'Testcase 1')
-        self.assertEqual(testcases[1].name, 'Testcase 2')
-
-    def test_field_loader(self):
-        fields = FieldLoader.load(self.file_content)
-        self.assertEqual(len(fields), 2)
-        self.assertEqual(fields[0].name, 'Field 1')
-        self.assertEqual(fields[1].name, 'Field 2')
-
-if __name__ == '__main__':
-    unittest.main()
+    def build(self):
+        return Testcase(
+            testcase_id=self._testcase_id,
+            name=self._name,
+            active=self._active,
+            version=self._version,
+            type=self._type,
+            scenario_id=self._scenario_id,
+            product_type=self._product_type,
+            event_type=self._event_type
+        )
