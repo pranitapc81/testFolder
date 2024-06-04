@@ -1,82 +1,22 @@
-from code5 import TradeDataProcessor
-# from sqlalchemy import create_engine, Column, Integer, String, MetaData, Table
-# from sqlalchemy.orm import sessionmaker
-# from sqlalchemy.ext.declarative import declarative_base
 import pandas as pd
 
-# Example DB2 connection string (replace with your actual DB2 connection string)
-db2_connection_string = 'db2+ibm_db://user:password@hostname:port/database'
+class ScenarioLoader:
+    @staticmethod
+    def load(file_path):
+        scenario_df = pd.read_excel(file_path, sheet_name='scenario')
+        scenarios = [Scenario(row['id'], row['name'], row['type'], row['active'], row['scenario_pack_id']) for index, row in scenario_df.iterrows()]
+        return scenarios
 
-# Create SQLAlchemy engine and session
-# engine = create_engine(db2_connection_string)
-# Session = sessionmaker(bind=engine)
-# session = Session()
+class TestcaseLoader:
+    @staticmethod
+    def load(file_path):
+        testcase_df = pd.read_excel(file_path, sheet_name='testcase')
+        testcases = [Testcase(row['id'], row['name'], row['active'], row['version'], row['type'], row['scenario_id'], row['product_type'], row['event_type']) for index, row in testcase_df.iterrows()]
+        return testcases
 
-# Base class for ORM mapping
-# Base = declarative_base()
-import pandas as pd
-import numpy as np
-
-
-# class TradeStub(Base):
-#     __tablename__ = 'trade_stub'
-#
-#     id = Column(Integer, primary_key=True)
-#     trade_id = Column(Integer)
-#     # Add more columns as needed
-#
-#     def __repr__(self):
-#         return f"<TradeStub(id={self.id}, trade_id={self.trade_id})>"
-
-class TradeDataManager:
-    def __init__(self):
-        pass
-
-    # self.session = env
-
-    def get_trades_with_filter_criteria(self, processed_trades_df):
-        exclude_columns = ['TradeID', 'GeneratedTradeID']
-        mask = processed_trades_df.drop(columns=exclude_columns).apply(
-            lambda x: x.notna().any() or x.astype(str).str.strip().ne('').any(), axis=1)
-        trades_with_filter_criteria_df = processed_trades_df[mask]
-        fixed_columns = ['Path', 'Value', 'RuleID', 'IsTradeID', 'GeneratedTradeID']
-        trades_with_filter_criteria_df = trades_with_filter_criteria_df.drop(columns=fixed_columns).drop_duplicates()
-
-        return trades_with_filter_criteria_df
-
-    def get_unique_tradeids(self, trades_df):
-        unique_tradeids = trades_df['TradeID'].unique()
-        return unique_tradeids
-
-    # def fetch_trade_stub_data(self):
-    #     unique_tradeids = self.get_unique_tradeids()
-    #
-    #     # Query using SQLAlchemy ORM
-    #     query = self.db_session.query(TradeStub).filter(TradeStub.trade_id.in_(unique_tradeids))
-    #
-    #     # Execute query and fetch results into DataFrame
-    #     trade_stub_data = pd.read_sql(query.statement, self.db_session.bind)
-    #
-    #     return trade_stub_data
-
-
-# Sample usage
-if __name__ == "__main__":
-    # Sample DataFrame
-    stubbing_file_path = "input.xlsx"
-    trade_processor = TradeDataProcessor(stubbing_file_path)
-    df = trade_processor.generate_stubbing_result()
-    print(df)
-
-    # Display the original DataFrame
-    print("Original DataFrame:")
-    print(df)
-
-    # Initialize the DataFrameCleaner class with the DataFrame
-    cleaner = TradeDataManager()
-
-    cleaned_df = cleaner.get_trades_with_filter_criteria(df)
-
-    # Display the cleaned DataFrame
-    print("\nCleaned DataFrame:")
-    print(cleaned_df)
+class FieldLoader:
+    @staticmethod
+    def load(file_path):
+        field_df = pd.read_excel(file_path, sheet_name='field')
+        fields = [Field(row['id'], row['name'], row['qwest_type'], row['active']) for index, row in field_df.iterrows()]
+        return fields
