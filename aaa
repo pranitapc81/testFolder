@@ -1,22 +1,21 @@
-import pandas as pd
+class DataLoader:
+    def __init__(self, file_path):
+        self.file_path = file_path
 
-class ScenarioLoader:
-    @staticmethod
-    def load(file_path):
-        scenario_df = pd.read_excel(file_path, sheet_name='scenario')
-        scenarios = [Scenario(row['id'], row['name'], row['type'], row['active'], row['scenario_pack_id']) for index, row in scenario_df.iterrows()]
-        return scenarios
+    def load_all_data(self):
+        # Load scenarios
+        scenarios = ScenarioLoader.load(self.file_path)
+        ScenarioService.load_scenarios(scenarios)
 
-class TestcaseLoader:
-    @staticmethod
-    def load(file_path):
-        testcase_df = pd.read_excel(file_path, sheet_name='testcase')
-        testcases = [Testcase(row['id'], row['name'], row['active'], row['version'], row['type'], row['scenario_id'], row['product_type'], row['event_type']) for index, row in testcase_df.iterrows()]
-        return testcases
+        # Load test cases
+        testcases = TestcaseLoader.load(self.file_path)
+        TestcaseService.load_testcases(testcases)
 
-class FieldLoader:
-    @staticmethod
-    def load(file_path):
-        field_df = pd.read_excel(file_path, sheet_name='field')
-        fields = [Field(row['id'], row['name'], row['qwest_type'], row['active']) for index, row in field_df.iterrows()]
-        return fields
+        # Load fields
+        fields = FieldLoader.load(self.file_path)
+        FieldService.load_fields(fields)
+
+if __name__ == "__main__":
+    excel_file_path = 'path_to_your_excel_file.xlsx'  # Replace with your actual file path
+    data_loader = DataLoader(excel_file_path)
+    data_loader.load_all_data()
