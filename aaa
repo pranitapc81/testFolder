@@ -1,9 +1,23 @@
-def count_scenarios_pass_fail(comparison_df):
-    # Group by scenario_id and check if all test cases in each group passed or failed
-    scenario_results = comparison_df.groupby('scenario_id')['overall_status'].agg(lambda x: 'Passed' if all(x == 'Passed') else 'Failed')
+import pandas as pd
 
-    # Count the number of scenarios where all test cases passed and where all test cases failed
-    pass_count = (scenario_results == 'Passed').sum()
-    fail_count = (scenario_results == 'Failed').sum()
+def count_pass_fail_cells(df):
+    result_columns = [col for col in df.columns if col.endswith('_Result')]
+    
+    pass_counts = df[result_columns].apply(lambda x: x.eq('Pass').sum()).sum()
+    fail_counts = df[result_columns].apply(lambda x: x.eq('Fail').sum()).sum()
+    
+    return pass_counts, fail_counts
 
-    return pass_count, fail_count
+# Example usage:
+# Assuming `comparison.df` is your pandas DataFrame
+data = {
+    'ID': [1, 2, 3, 4, 5],
+    'Math_Result': ['Pass', 'Fail', 'Pass', 'Pass', 'Fail'],
+    'Science_Result': ['Fail', 'Pass', 'Pass', 'Fail', 'Fail']
+}
+comparison_df = pd.DataFrame(data)
+
+pass_count, fail_count = count_pass_fail_cells(comparison_df)
+
+print(f"Number of cells with 'Pass' value: {pass_count}")
+print(f"Number of cells with 'Fail' value: {fail_count}")
