@@ -1,104 +1,67 @@
-import unittest
-from your_module import Scenario, Testcase, Field, ScenarioBuilder, TestcaseBuilder, ScenarioLoader, TestcaseLoader, FieldLoader
-import pandas as pd
-from io import BytesIO
-
-class TestScenarioBuilder(unittest.TestCase):
-    def test_scenario_builder(self):
-        scenario = (ScenarioBuilder()
-                    .set_scenario_id('12345')
-                    .set_name('Test Scenario')
-                    .set_type('Functional')
-                    .set_active(True)
-                    .set_scenario_pack_id('54321')
-                    .build())
-
-        self.assertEqual(scenario.scenario_id, '12345')
-        self.assertEqual(scenario.name, 'Test Scenario')
-        self.assertEqual(scenario.type, 'Functional')
-        self.assertEqual(scenario.active, True)
-        self.assertEqual(scenario.scenario_pack_id, '54321')
-
-class TestTestcaseBuilder(unittest.TestCase):
-    def test_testcase_builder(self):
-        testcase = (TestcaseBuilder()
-                    .set_testcase_id('12345')
-                    .set_name('Test Case')
-                    .set_active(True)
-                    .set_version('1.0')
-                    .set_type('Regression')
-                    .set_scenario_id('54321')
-                    .set_product_type('ProductA')
-                    .set_event_type('EventA')
-                    .build())
-
-        self.assertEqual(testcase.testcase_id, '12345')
-        self.assertEqual(testcase.name, 'Test Case')
-        self.assertEqual(testcase.active, True)
-        self.assertEqual(testcase.version, '1.0')
-        self.assertEqual(testcase.type, 'Regression')
-        self.assertEqual(testcase.scenario_id, '54321')
-        self.assertEqual(testcase.product_type, 'ProductA')
-        self.assertEqual(testcase.event_type, 'EventA')
-
-class TestLoader(unittest.TestCase):
-    def setUp(self):
-        # Create a dummy Excel file in memory
-        self.file_content = BytesIO()
-        writer = pd.ExcelWriter(self.file_content, engine='openpyxl')
-
-        scenario_data = {
-            'id': ['1', '2'],
-            'name': ['Scenario 1', 'Scenario 2'],
-            'type': ['Functional', 'Performance'],
-            'active': [True, False],
-            'scenario_pack_id': ['100', '200']
-        }
-        scenario_df = pd.DataFrame(scenario_data)
-        scenario_df.to_excel(writer, sheet_name='scenario', index=False)
-
-        testcase_data = {
-            'id': ['1', '2'],
-            'name': ['Testcase 1', 'Testcase 2'],
-            'active': [True, False],
-            'version': ['1.0', '2.0'],
-            'type': ['Regression', 'Smoke'],
-            'scenario_id': ['1', '2'],
-            'product_type': ['ProductA', 'ProductB'],
-            'event_type': ['EventA', 'EventB']
-        }
-        testcase_df = pd.DataFrame(testcase_data)
-        testcase_df.to_excel(writer, sheet_name='testcase', index=False)
-
-        field_data = {
-            'id': ['1', '2'],
-            'name': ['Field 1', 'Field 2'],
-            'qwest_type': ['TypeA', 'TypeB'],
-            'active': [True, False]
-        }
-        field_df = pd.DataFrame(field_data)
-        field_df.to_excel(writer, sheet_name='field', index=False)
-
-        writer.save()
-        self.file_content.seek(0)
-
-    def test_scenario_loader(self):
-        scenarios = ScenarioLoader.load(self.file_content)
-        self.assertEqual(len(scenarios), 2)
-        self.assertEqual(scenarios[0].name, 'Scenario 1')
-        self.assertEqual(scenarios[1].name, 'Scenario 2')
-
-    def test_testcase_loader(self):
-        testcases = TestcaseLoader.load(self.file_content)
-        self.assertEqual(len(testcases), 2)
-        self.assertEqual(testcases[0].name, 'Testcase 1')
-        self.assertEqual(testcases[1].name, 'Testcase 2')
-
-    def test_field_loader(self):
-        fields = FieldLoader.load(self.file_content)
-        self.assertEqual(len(fields), 2)
-        self.assertEqual(fields[0].name, 'Field 1')
-        self.assertEqual(fields[1].name, 'Field 2')
-
-if __name__ == '__main__':
-    unittest.main()
+First Approach
+Mandate Specificity:
+Highly specific to each mandate.
+Each new mandate requires new implementation in codebase and database tables.
+Asset Class Specificity:
+Highly specific to each asset class.
+Each new asset class requires new implementation in codebase and database tables.
+Version Handling:
+Moving to a new versioned mandate requires decommissioning old code.
+Entirely new implementations are needed for new versions.
+Database Schema Changes:
+Frequent changes required.
+Adding new mandates or asset classes necessitates additional tables and schema modifications.
+Rule Implementation:
+Rules are mandate-specific and asset class-specific.
+New implementations needed for each mandate and asset class.
+Development Complexity:
+Higher complexity due to specificity.
+Frequent updates needed for new additions.
+Maintenance Effort:
+High maintenance due to constant updates and new implementations.
+Code Reusability:
+Low. Each new mandate and asset class requires new code.
+Flexibility:
+Low flexibility. Each change requires significant development effort.
+Scalability:
+Difficult to scale due to specificity.
+Second Approach
+Mandate Specificity:
+Mandate agnostic.
+New mandates do not require changes to the codebase or database schema.
+Asset Class Specificity:
+Asset class agnostic.
+New asset classes do not require changes to the codebase or database schema.
+Version Handling:
+New versions do not waste previous development efforts.
+Easier to handle new versions without redundant work.
+Database Schema Changes:
+No schema changes required for adding new mandates or asset classes.
+The schema remains stable.
+Rule Implementation:
+Rules are used across all mandates and asset classes.
+Reduces the need for mandate-specific implementations.
+Development Complexity:
+Lower complexity.
+Unified approach reduces the need for frequent updates and new implementations.
+Maintenance Effort:
+Lower maintenance.
+Unified rules and schema reduce the need for constant updates.
+Code Reusability:
+High. Common rules and schema lead to higher code reusability.
+Flexibility:
+High flexibility.
+Easier to onboard new mandates and asset classes without major changes.
+Scalability:
+Easier to scale.
+Unified approach supports new mandates and asset classes without major changes.
+Favoring Second Approach
+Flexibility and Scalability:
+More flexible and scalable, allowing new mandates and asset classes to be added without significant changes.
+Code Reusability:
+Promotes code reusability by using common rules across all mandates and asset classes.
+Efficiency:
+Reduces development and maintenance efforts.
+Ensures previous development efforts are not wasted when moving to new versions.
+Cost-Effectiveness:
+More efficient and cost-effective in the long run.
