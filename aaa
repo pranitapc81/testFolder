@@ -1,67 +1,9 @@
-First Approach
-Mandate Specificity:
-Highly specific to each mandate.
-Each new mandate requires new implementation in codebase and database tables.
-Asset Class Specificity:
-Highly specific to each asset class.
-Each new asset class requires new implementation in codebase and database tables.
-Version Handling:
-Moving to a new versioned mandate requires decommissioning old code.
-Entirely new implementations are needed for new versions.
-Database Schema Changes:
-Frequent changes required.
-Adding new mandates or asset classes necessitates additional tables and schema modifications.
-Rule Implementation:
-Rules are mandate-specific and asset class-specific.
-New implementations needed for each mandate and asset class.
-Development Complexity:
-Higher complexity due to specificity.
-Frequent updates needed for new additions.
-Maintenance Effort:
-High maintenance due to constant updates and new implementations.
-Code Reusability:
-Low. Each new mandate and asset class requires new code.
-Flexibility:
-Low flexibility. Each change requires significant development effort.
-Scalability:
-Difficult to scale due to specificity.
-Second Approach
-Mandate Specificity:
-Mandate agnostic.
-New mandates do not require changes to the codebase or database schema.
-Asset Class Specificity:
-Asset class agnostic.
-New asset classes do not require changes to the codebase or database schema.
-Version Handling:
-New versions do not waste previous development efforts.
-Easier to handle new versions without redundant work.
-Database Schema Changes:
-No schema changes required for adding new mandates or asset classes.
-The schema remains stable.
-Rule Implementation:
-Rules are used across all mandates and asset classes.
-Reduces the need for mandate-specific implementations.
-Development Complexity:
-Lower complexity.
-Unified approach reduces the need for frequent updates and new implementations.
-Maintenance Effort:
-Lower maintenance.
-Unified rules and schema reduce the need for constant updates.
-Code Reusability:
-High. Common rules and schema lead to higher code reusability.
-Flexibility:
-High flexibility.
-Easier to onboard new mandates and asset classes without major changes.
-Scalability:
-Easier to scale.
-Unified approach supports new mandates and asset classes without major changes.
-Favoring Second Approach
-Flexibility and Scalability:
-More flexible and scalable, allowing new mandates and asset classes to be added without significant changes.
-Code Reusability:
-Promotes code reusability by using common rules across all mandates and asset classes.
-Efficiency:
-Reduces development and maintenance efforts.
-Ensures previous development efforts are not wasted when moving to new versions.
-Cost-Effectiveness:
-More efficient and cost-effective in the long run.
+def count_scenarios_pass_fail(comparison_df):
+    # Group by scenario_id and check if all test cases in each group passed or failed
+    scenario_results = comparison_df.groupby('scenario_id')['overall_status'].agg(lambda x: 'Passed' if all(x == 'Passed') else 'Failed')
+
+    # Count the number of scenarios where all test cases passed and where all test cases failed
+    pass_count = (scenario_results == 'Passed').sum()
+    fail_count = (scenario_results == 'Failed').sum()
+
+    return pass_count, fail_count
