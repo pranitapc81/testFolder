@@ -1,104 +1,34 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Comparison of Approaches</title>
-    <style>
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            border: 1px solid #dddddd;
-            text-align: left;
-            padding: 8px;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        .favoring-section {
-            background-color: #d9ead3;
-            font-weight: bold;
-        }
-    </style>
-</head>
-<body>
+import pandas as pd
 
-<h2>Comparison of Approaches</h2>
+def process_mandate_specific_sheets(mandate, df):
+    # Placeholder for your custom processing method
+    print(f"Processing mandate: {mandate}")
+    # Add your custom processing logic here
+    # For example: print(df)
 
-<table>
-    <thead>
-        <tr>
-            <th>Aspect</th>
-            <th>First Approach</th>
-            <th>Second Approach</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>Mandate Specificity</td>
-            <td>Highly specific to each mandate. Each new mandate requires new implementation in codebase and database tables.</td>
-            <td>Mandate agnostic. New mandates do not require changes to the codebase or database schema.</td>
-        </tr>
-        <tr>
-            <td>Asset Class Specificity</td>
-            <td>Highly specific to each asset class. Each new asset class requires new implementation in codebase and database tables.</td>
-            <td>Asset class agnostic. New asset classes do not require changes to the codebase or database schema.</td>
-        </tr>
-        <tr>
-            <td>Version Handling</td>
-            <td>Moving to a new versioned mandate requires decommissioning old code. Entirely new implementations are needed for new versions.</td>
-            <td>New versions do not waste previous development efforts. Easier to handle new versions without redundant work.</td>
-        </tr>
-        <tr>
-            <td>Database Schema Changes</td>
-            <td>Frequent changes required. Adding new mandates or asset classes necessitates additional tables and schema modifications.</td>
-            <td>No schema changes required for adding new mandates or asset classes. The schema remains stable.</td>
-        </tr>
-        <tr>
-            <td>Rule Implementation</td>
-            <td>Rules are mandate-specific and asset class-specific. New implementations needed for each mandate and asset class.</td>
-            <td>Rules are used across all mandates and asset classes. Reduces the need for mandate-specific implementations.</td>
-        </tr>
-        <tr>
-            <td>Development Complexity</td>
-            <td>Higher complexity due to specificity. Frequent updates needed for new additions.</td>
-            <td>Lower complexity. Unified approach reduces the need for frequent updates and new implementations.</td>
-        </tr>
-        <tr>
-            <td>Maintenance Effort</td>
-            <td>High maintenance due to constant updates and new implementations.</td>
-            <td>Lower maintenance. Unified rules and schema reduce the need for constant updates.</td>
-        </tr>
-        <tr>
-            <td>Code Reusability</td>
-            <td>Low. Each new mandate and asset class requires new code.</td>
-            <td>High. Common rules and schema lead to higher code reusability.</td>
-        </tr>
-        <tr>
-            <td>Flexibility</td>
-            <td>Low flexibility. Each change requires significant development effort.</td>
-            <td>High flexibility. Easier to onboard new mandates and asset classes without major changes.</td>
-        </tr>
-        <tr>
-            <td>Scalability</td>
-            <td>Difficult to scale due to specificity.</td>
-            <td>Easier to scale. Unified approach supports new mandates and asset classes without major changes.</td>
-        </tr>
-    </tbody>
-    <tfoot>
-        <tr class="favoring-section">
-            <td>Favoring Second Approach</td>
-            <td colspan="2">
-                Flexibility and Scalability: More flexible and scalable, allowing new mandates and asset classes to be added without significant changes. <br>
-                Code Reusability: Promotes code reusability by using common rules across all mandates and asset classes. <br>
-                Efficiency: Reduces development and maintenance efforts. Ensures previous development efforts are not wasted when moving to new versions. <br>
-                Cost-Effectiveness: More efficient and cost-effective in the long run.
-            </td>
-        </tr>
-    </tfoot>
-</table>
+def split_csv_by_mandate(csv_paths, mandate_column_name):
+    for csv_path in csv_paths:
+        # Read the CSV file
+        df = pd.read_csv(csv_path)
+        
+        # Ensure the mandate column exists in the CSV
+        if mandate_column_name not in df.columns:
+            print(f"Mandate column {mandate_column_name} not found in {csv_path}")
+            continue
+        
+        # Identify unique mandates
+        unique_mandates = df[mandate_column_name].unique()
+        
+        # Split and process each mandate
+        for mandate in unique_mandates:
+            mandate_specific_df = df[df[mandate_column_name] == mandate]
+            process_mandate_specific_sheets(mandate, mandate_specific_df)
 
-</body>
-</html>
+# Example usage
+csv_paths = [
+    '/path/to/your/csvfile1.csv',
+    '/path/to/your/csvfile2.csv'
+]
+mandate_column_name = 'Mandate'  # Replace with the actual column name you are referring to
+
+split_csv_by_mandate(csv_paths, mandate_column_name)
