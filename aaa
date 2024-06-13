@@ -1,23 +1,39 @@
 import pandas as pd
 import os
 
-def split_csv_by_mandate(input_csv, output_dir):
+def split_csv_by_mandate(file_path, output_dir):
     # Read the CSV file
-    df = pd.read_csv(input_csv)
-    
-    # Ensure the output directory exists
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    
-    # Get unique values in the 'Mandate' column
-    unique_mandates = df['Mandate'].unique()
-    
-    # Split the DataFrame based on unique 'Mandate' values and save to new CSV files
-    for mandate in unique_mandates:
-        mandate_df = df[df['Mandate'] == mandate]
-        output_csv = os.path.join(output_dir, f'mandate_{mandate}.csv')
-        mandate_df.to_csv(output_csv, index=False)
-        print(f'Saved {output_csv}')
-        
-# Example usage:
-# split_csv_by_mandate('input.csv', 'output_directory')
+    df = pd.read_csv(file_path)
+
+    # Create the output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Get the unique mandates
+    mandates = df['Mandate'].unique()
+
+    # Split and save the data based on mandates
+    for mandate in mandates:
+        # Filter the dataframe for the current mandate
+        df_mandate = df[df['Mandate'] == mandate]
+
+        # Define the output file path
+        output_file_path = os.path.join(output_dir, f"{mandate}.csv")
+
+        # Save the filtered dataframe to a CSV file
+        df_mandate.to_csv(output_file_path, index=False)
+
+    print(f"Files have been saved to {output_dir}")
+
+# Define the input file paths
+actual_file_path = 'actual.csv'
+expected_file_path = 'expected.csv'
+
+# Define the output directories
+actual_output_dir = 'actual_splits'
+expected_output_dir = 'expected_splits'
+
+# Split the actual.csv file
+split_csv_by_mandate(actual_file_path, actual_output_dir)
+
+# Split the expected.csv file
+split_csv_by_mandate(expected_file_path, expected_output_dir)
