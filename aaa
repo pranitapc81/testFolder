@@ -1,39 +1,26 @@
-import pandas as pd
-import os
+Chloe has a strong grasp of the concepts involved and consistently asks insightful questions that enhance our understanding and approach. Her proactive attitude and ability to seek clarification have been instrumental in resolving complex issues, particularly during our discussions on [specific aspect of the test plan].
 
-def split_csv_by_mandate(file_path, output_dir):
-    # Read the CSV file
-    df = pd.read_csv(file_path)
+She is incredibly helpful and responsible, often going out of her way to assist team members. Her support has been invaluable, especially when troubleshooting [specific task or tool].
 
-    # Create the output directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
+Chloe consistently delivers high-quality work on time, exemplifying reliability and dedication. Her contributions have significantly strengthened our project.
 
-    # Get the unique mandates
-    mandates = df['Mandate'].unique()
 
-    # Split and save the data based on mandates
-    for mandate in mandates:
-        # Filter the dataframe for the current mandate
-        df_mandate = df[df['Mandate'] == mandate]
+Feedback for Roberto
 
-        # Define the output file path
-        output_file_path = os.path.join(output_dir, f"{mandate}.csv")
+Roberto has been a tremendous asset to our team on the test plan project. He consistently demonstrates a proactive attitude and is always eager to help. His technical skills are impressive, and he actively seeks to understand the technical rationale behind every feature, which is commendable.
 
-        # Save the filtered dataframe to a CSV file
-        df_mandate.to_csv(output_file_path, index=False)
+Key strengths include:
 
-    print(f"Files have been saved to {output_dir}")
+Proactivity: Roberto takes initiative and anticipates project needs, ensuring smooth progress.
+Technical Expertise: He exhibits strong technical skills and always seeks to deepen his understanding, asking insightful questions that benefit the team.
+Collaboration: Roberto is always willing to assist his teammates, fostering a supportive and collaborative environment.
+Overall, Roberto's contributions have been invaluable, and his dedication and teamwork are greatly appreciated.
 
-# Define the input file paths
-actual_file_path = 'actual.csv'
-expected_file_path = 'expected.csv'
 
-# Define the output directories
-actual_output_dir = 'actual_splits'
-expected_output_dir = 'expected_splits'
+Adina has recently started getting more involved in our project, which is a positive development. She has been contributing to small tasks effectively, and this engagement is expected to prepare her for taking on larger responsibilities in the future.
 
-# Split the actual.csv file
-split_csv_by_mandate(actual_file_path, actual_output_dir)
+Areas for improvement:
 
-# Split the expected.csv file
-split_csv_by_mandate(expected_file_path, expected_output_dir)
+Increased Involvement: While Adina has made strides in contributing to small tasks, she can further increase her involvement by actively seeking out additional responsibilities and larger tasks within the project.
+Proactivity: There is an opportunity for Adina to be more proactive. By anticipating project needs and taking initiative, she can significantly enhance her contributions and impact on the team.
+Overall, Adina's recent contributions are appreciated, and with continued growth in these areas, she will be able to take on more significant tasks and responsibilities effectively.
