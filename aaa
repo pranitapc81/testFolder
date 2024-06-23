@@ -1,32 +1,27 @@
 import pandas as pd
 
-def merge_product_type(df, df2):
-    # Step 1: Merge df2 with df based on matching id and powerbi_tc_id
-    merged_df = pd.merge(df2, df, left_on='powerbi_tc_id', right_on='id', how='left')
-    
-    # Step 2: Identify powerbi_tc_id values without a matching product_type
-    missing_product_types = merged_df[merged_df['product_type'].isnull()]['powerbi_tc_id'].tolist()
-    
-    # Return the merged DataFrame with added product_type and the list of missing powerbi_tc_id
-    return merged_df, missing_product_types
+# Example DataFrame (replace with your actual DataFrame)
+data = {
+    'Overall_status': ['Fail', 'Pass', 'Blocked', 'Pending_Delivery', 'Day2'],
+    'TC_STATUS': ['Ready_to_Test', 'Ready_to_Test', 'Blocked', 'Pending_Delivery', 'Day2'],
+    'PRODUCT_TYPE': ['nonexotic', 'nonexotic', 'nonexotic', 'nonexotic', 'nonexotic'],
+    'EVENT_TYPE': ['newt', 'newt', 'newt', 'other', 'other']
+}
+df = pd.DataFrame(data)
 
-# Example DataFrames (replace with your actual DataFrames)
-df = pd.DataFrame({
-    'id': [1, 2, 3, 4, 5],
-    'product_type': ['A', 'B', 'C', 'D', 'E']
-})
+# Define mapping of TC_STATUS to conditions
+conditions = {
+    'Ready_to_Test': ['Fail', 'Pass'],
+    'Blocked': 'Blocked',
+    'Pending_Delivery': 'Pending_Delivery',
+    'Day2': 'Day2'
+}
 
-df2 = pd.DataFrame({
-    'powerbi_tc_id': [1, 2, 3, 6, 7],
-    'other_column': ['X', 'Y', 'Z', 'P', 'Q']
-})
+# Apply conditions to Overall_status
+df['Overall_status'] = df.apply(lambda row: conditions[row['TC_STATUS']] if row['TC_STATUS'] in conditions else row['Overall_status'], axis=1)
 
-# Call the method
-merged_df, missing_product_types = merge_product_type(df, df2)
+# Group by PRODUCT_TYPE and EVENT_TYPE, and count the occurrences of each Overall_status
+counts = df.groupby(['PRODUCT_TYPE', 'EVENT_TYPE', 'Overall_status']).size().unstack(-1).fillna(0).to_dict()
 
-# Display the results
-print("Merged DataFrame:")
-print(merged_df)
-
-print("\nPowerbi_tc_id values without a matching product_type:")
-print(missing_product_types)
+# Print the counts
+print(counts)
