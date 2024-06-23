@@ -1,26 +1,32 @@
-Chloe has a strong grasp of the concepts involved and consistently asks insightful questions that enhance our understanding and approach. Her proactive attitude and ability to seek clarification have been instrumental in resolving complex issues, particularly during our discussions on [specific aspect of the test plan].
+import pandas as pd
 
-She is incredibly helpful and responsible, often going out of her way to assist team members. Her support has been invaluable, especially when troubleshooting [specific task or tool].
+def merge_product_type(df, df2):
+    # Step 1: Merge df2 with df based on matching id and powerbi_tc_id
+    merged_df = pd.merge(df2, df, left_on='powerbi_tc_id', right_on='id', how='left')
+    
+    # Step 2: Identify powerbi_tc_id values without a matching product_type
+    missing_product_types = merged_df[merged_df['product_type'].isnull()]['powerbi_tc_id'].tolist()
+    
+    # Return the merged DataFrame with added product_type and the list of missing powerbi_tc_id
+    return merged_df, missing_product_types
 
-Chloe consistently delivers high-quality work on time, exemplifying reliability and dedication. Her contributions have significantly strengthened our project.
+# Example DataFrames (replace with your actual DataFrames)
+df = pd.DataFrame({
+    'id': [1, 2, 3, 4, 5],
+    'product_type': ['A', 'B', 'C', 'D', 'E']
+})
 
+df2 = pd.DataFrame({
+    'powerbi_tc_id': [1, 2, 3, 6, 7],
+    'other_column': ['X', 'Y', 'Z', 'P', 'Q']
+})
 
-Feedback for Roberto
+# Call the method
+merged_df, missing_product_types = merge_product_type(df, df2)
 
-Roberto has been a tremendous asset to our team on the test plan project. He consistently demonstrates a proactive attitude and is always eager to help. His technical skills are impressive, and he actively seeks to understand the technical rationale behind every feature, which is commendable.
+# Display the results
+print("Merged DataFrame:")
+print(merged_df)
 
-Key strengths include:
-
-Proactivity: Roberto takes initiative and anticipates project needs, ensuring smooth progress.
-Technical Expertise: He exhibits strong technical skills and always seeks to deepen his understanding, asking insightful questions that benefit the team.
-Collaboration: Roberto is always willing to assist his teammates, fostering a supportive and collaborative environment.
-Overall, Roberto's contributions have been invaluable, and his dedication and teamwork are greatly appreciated.
-
-
-Adina has recently started getting more involved in our project, which is a positive development. She has been contributing to small tasks effectively, and this engagement is expected to prepare her for taking on larger responsibilities in the future.
-
-Areas for improvement:
-
-Increased Involvement: While Adina has made strides in contributing to small tasks, she can further increase her involvement by actively seeking out additional responsibilities and larger tasks within the project.
-Proactivity: There is an opportunity for Adina to be more proactive. By anticipating project needs and taking initiative, she can significantly enhance her contributions and impact on the team.
-Overall, Adina's recent contributions are appreciated, and with continued growth in these areas, she will be able to take on more significant tasks and responsibilities effectively.
+print("\nPowerbi_tc_id values without a matching product_type:")
+print(missing_product_types)
