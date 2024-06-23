@@ -9,26 +9,30 @@ data = {
 }
 df = pd.DataFrame(data)
 
+# Initialize counts dictionary
+statuses = ['Fail', 'Pass', 'Blocked', 'Pending_Delivery', 'Day2']
+event_types = ['newt', 'other']
+product_types = ['nonexotic', 'exotic']
+
+counts = {pt: {et: {status: 0 for status in statuses} for et in event_types} for pt in product_types}
+
 # Define mapping of TC_STATUS to conditions
 conditions = {
     'Ready_to_Test': ['Fail', 'Pass'],
-    'Blocked': 'Blocked',
-    'Pending_Delivery': 'Pending_Delivery',
-    'Day2': 'Day2'
+    'Blocked': ['Blocked'],
+    'Pending_Delivery': ['Pending_Delivery'],
+    'Day2': ['Day2']
 }
 
-# Apply conditions to Overall_status
-df['Overall_status'] = df.apply(lambda row: row['Overall_status'] if row['TC_STATUS'] in ['Blocked', 'Pending_Delivery', 'Day2'] else 'Fail' if row['Overall_status'] == 'Fail' else 'Pass', axis=1)
-
-# Group by PRODUCT_TYPE and EVENT_TYPE, and count the occurrences of each Overall_status
-counts = df.groupby(['PRODUCT_TYPE', 'EVENT_TYPE', 'Overall_status']).size().unstack(-1).fillna(0)
-
-# Convert the result to a dictionary
-counts_dict = {}
-for product_type, event_type_counts in counts.groupby('PRODUCT_TYPE'):
-    counts_dict[product_type] = {}
-    for event_type, status_counts in event_type_counts.groupby('EVENT_TYPE'):
-        counts_dict[product_type][event_type] = status_counts.to_dict()
+# Filter DataFrame and update counts
+for tc_status, valid_statuses in conditions.items():
+    valid_statuses = valid_statuses if isinstance(valid_statuses, list) else [valid_statuses]
+    for status in valid_statuses:
+        mask = (df['TC_STATUS'] == tc_status) & (df['Overall_status'] == status)
+        grouped = df[mask].groupby(['PRODUCT_TYPE', 'EVENT_TYPE']).size()
+        for (product_type, event_type), count in grouped.items():
+            if product_type in counts and event_type in counts[product_type]:
+                counts[product_type][event_type][status] += count
 
 # Print the counts
-print(counts_dict)
+print(counts)
