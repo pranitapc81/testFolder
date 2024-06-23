@@ -18,10 +18,17 @@ conditions = {
 }
 
 # Apply conditions to Overall_status
-df['Overall_status'] = df.apply(lambda row: conditions[row['TC_STATUS']] if row['TC_STATUS'] in conditions else row['Overall_status'], axis=1)
+df['Overall_status'] = df.apply(lambda row: row['Overall_status'] if row['TC_STATUS'] in ['Blocked', 'Pending_Delivery', 'Day2'] else 'Fail' if row['Overall_status'] == 'Fail' else 'Pass', axis=1)
 
 # Group by PRODUCT_TYPE and EVENT_TYPE, and count the occurrences of each Overall_status
-counts = df.groupby(['PRODUCT_TYPE', 'EVENT_TYPE', 'Overall_status']).size().unstack(-1).fillna(0).to_dict()
+counts = df.groupby(['PRODUCT_TYPE', 'EVENT_TYPE', 'Overall_status']).size().unstack(-1).fillna(0)
+
+# Convert the result to a dictionary
+counts_dict = {}
+for product_type, event_type_counts in counts.groupby('PRODUCT_TYPE'):
+    counts_dict[product_type] = {}
+    for event_type, status_counts in event_type_counts.groupby('EVENT_TYPE'):
+        counts_dict[product_type][event_type] = status_counts.to_dict()
 
 # Print the counts
-print(counts)
+print(counts_dict)
