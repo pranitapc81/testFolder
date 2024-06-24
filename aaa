@@ -1,25 +1,54 @@
 import pandas as pd
 
-def count_result_values(comparison_df):
+def count_result_values_by_event_type_and_product(comparison_df):
     # Identify the columns that start with 'Result_'
     result_columns = [col for col in comparison_df.columns if col.startswith('Result_')]
     
-    # Dictionary to store counts of each value
-    counts = {val: 0 for val in ['pass', 'fail', 'pending delivery', 'blocked', 'day2']}
+    # Initialize dictionaries to store counts for each combination
+    counts_dict = {
+        'nonexotic': {
+            'newt': {val: 0 for val in ['pass', 'fail', 'pending delivery', 'blocked', 'day2']},
+            'lce': {val: 0 for val in ['pass', 'fail', 'pending delivery', 'blocked', 'day2']}
+        },
+        'exotic': {
+            'newt': {val: 0 for val in ['pass', 'fail', 'pending delivery', 'blocked', 'day2']},
+            'lce': {val: 0 for val in ['pass', 'fail', 'pending delivery', 'blocked', 'day2']}
+        }
+    }
     
-    # Iterate through each Result_ column and count occurrences of each value
-    for col in result_columns:
-        for val in counts.keys():
-            counts[val] += (comparison_df[col] == val).sum()
+    # Separate DataFrames based on Expected_EventType and Expectedproduct
+    conditions = [
+        ('nonexotic', 'newt'),
+        ('nonexotic', 'lce'),
+        ('exotic', 'newt'),
+        ('exotic', 'lce')
+    ]
     
-    return counts
+    for product_type, event_type in conditions:
+        df = comparison_df[
+            (comparison_df['Expectedproduct'] == product_type) & 
+            (comparison_df['Expected_EventType'] == event_type)
+        ]
+        
+        # Function to count occurrences in a DataFrame
+        def count_occurrences(df, counts):
+            for col in result_columns:
+                for val in counts.keys():
+                    counts[val] += (df[col] == val).sum()
+        
+        # Count occurrences for each condition
+        count_occurrences(df, counts_dict[product_type][event_type])
+    
+    return counts_dict
 
 # Example usage
 comparison_df = pd.DataFrame({
     'Result_1': ['pass', 'fail', 'pending delivery', 'blocked', 'day2', 'pass'],
     'Result_2': ['fail', 'pass', 'pending delivery', 'day2', 'blocked', 'pass'],
+    'Expected_EventType': ['newt', 'old', 'newt', 'newt', 'old', 'newt'],
+    'Expectedproduct': ['nonexotic', 'nonexotic', 'exotic', 'exotic', 'nonexotic', 'exotic'],
     'Other_Column': [1, 2, 3, 4, 5, 6]
 })
 
-result_counts = count_result_values(comparison_df)
+result_counts = count_result_values_by_event_type_and_product(comparison_df)
 print(result_counts)
