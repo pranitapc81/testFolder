@@ -1,34 +1,25 @@
-# test_data_processing.py
-import unittest
 import pandas as pd
-from data_processing import calculate_counts  # Import the function correctly
 
-class TestCalculateCounts(unittest.TestCase):
+def count_result_values(comparison_df):
+    # Identify the columns that start with 'Result_'
+    result_columns = [col for col in comparison_df.columns if col.startswith('Result_')]
+    
+    # Dictionary to store counts of each value
+    counts = {val: 0 for val in ['pass', 'fail', 'pending delivery', 'blocked', 'day2']}
+    
+    # Iterate through each Result_ column and count occurrences of each value
+    for col in result_columns:
+        for val in counts.keys():
+            counts[val] += (comparison_df[col] == val).sum()
+    
+    return counts
 
-    def setUp(self):
-        # Example DataFrame
-        self.data = {
-            'Overall_status': ['Fail', 'Pass', 'Blocked', 'Pending_Delivery', 'Day2'],
-            'TC_STATUS': ['Ready_to_Test', 'Ready_to_Test', 'Blocked', 'Pending_Delivery', 'Day2'],
-            'PRODUCT_TYPE': ['nonexotic', 'nonexotic', 'nonexotic', 'nonexotic', 'nonexotic'],
-            'EVENT_TYPE': ['newt', 'newt', 'newt', 'other', 'other']
-        }
-        self.df = pd.DataFrame(self.data)
+# Example usage
+comparison_df = pd.DataFrame({
+    'Result_1': ['pass', 'fail', 'pending delivery', 'blocked', 'day2', 'pass'],
+    'Result_2': ['fail', 'pass', 'pending delivery', 'day2', 'blocked', 'pass'],
+    'Other_Column': [1, 2, 3, 4, 5, 6]
+})
 
-    def test_calculate_counts(self):
-        expected_counts = {
-            'nonexotic': {
-                'newt': {'Fail': 1, 'Pass': 1, 'Blocked': 1, 'Pending_Delivery': 0, 'Day2': 0},
-                'other': {'Fail': 0, 'Pass': 0, 'Blocked': 0, 'Pending_Delivery': 1, 'Day2': 1}
-            },
-            'exotic': {
-                'newt': {'Fail': 0, 'Pass': 0, 'Blocked': 0, 'Pending_Delivery': 0, 'Day2': 0},
-                'other': {'Fail': 0, 'Pass': 0, 'Blocked': 0, 'Pending_Delivery': 0, 'Day2': 0}
-            }
-        }
-
-        result_counts = calculate_counts(self.df)
-        self.assertEqual(result_counts, expected_counts)
-
-if __name__ == '__main__':
-    unittest.main()
+result_counts = count_result_values(comparison_df)
+print(result_counts)
