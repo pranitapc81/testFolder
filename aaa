@@ -1,54 +1,134 @@
-import pandas as pd
+Here’s the revised **Performance and Impact** section with first-person phrasing:
 
-def count_result_values_by_event_type_and_product(comparison_df):
-    # Identify the columns that start with 'Result_'
-    result_columns = [col for col in comparison_df.columns if col.startswith('Result_')]
-    
-    # Initialize dictionaries to store counts for each combination
-    counts_dict = {
-        'nonexotic': {
-            'newt': {val: 0 for val in ['pass', 'fail', 'pending delivery', 'blocked', 'day2']},
-            'lce': {val: 0 for val in ['pass', 'fail', 'pending delivery', 'blocked', 'day2']}
-        },
-        'exotic': {
-            'newt': {val: 0 for val in ['pass', 'fail', 'pending delivery', 'blocked', 'day2']},
-            'lce': {val: 0 for val in ['pass', 'fail', 'pending delivery', 'blocked', 'day2']}
-        }
-    }
-    
-    # Separate DataFrames based on Expected_EventType and Expectedproduct
-    conditions = [
-        ('nonexotic', 'newt'),
-        ('nonexotic', 'lce'),
-        ('exotic', 'newt'),
-        ('exotic', 'lce')
-    ]
-    
-    for product_type, event_type in conditions:
-        df = comparison_df[
-            (comparison_df['Expectedproduct'] == product_type) & 
-            (comparison_df['Expected_EventType'] == event_type)
-        ]
-        
-        # Function to count occurrences in a DataFrame
-        def count_occurrences(df, counts):
-            for col in result_columns:
-                for val in counts.keys():
-                    counts[val] += (df[col] == val).sum()
-        
-        # Count occurrences for each condition
-        count_occurrences(df, counts_dict[product_type][event_type])
-    
-    return counts_dict
+### 1. **Performance and Impact (Expanded):**
+   - **Developed End-to-End Solutions:** I successfully built and maintained an **end-to-end trade cloning tool** used by all mandates, providing advanced trade cloning capabilities based on custom rules and eliminating the need for external databases like Reflow DB. This tool replaced two legacy systems (Purge-Reflow and the older trade cloning tool), streamlining processes and improving efficiency.
+   - **Innovative in Regulatory Reporting:** I designed **Power BI reporting tools** from scratch that offer real-time insights for regulatory compliance, enhancing the accuracy and timeliness of reports across multiple global mandates (EMIR, ASIC, MAS).
+   - **Enhancing Testing Capabilities:** I played a key role in **test digitization** by building a robust database infrastructure for the **Testplan tool**, which stores input/output data along with detailed execution, field, and test case information. This greatly improved the team’s ability to track, analyze, and automate test cases, significantly enhancing overall test management.
+   - **Cross-Functional Leadership:** I led **cross-functional teams**, aligning efforts between Power BI, AI/ML, and regulatory mandates to ensure that all teams were equipped with the right tools and data to meet regulatory obligations effectively.
+   - **Improved Trade Accuracy and Efficiency:** I developed an **AI/ML-based auto-healing solution** that automatically fixes errors in trade input data, reducing manual intervention and improving the accuracy and efficiency of trade reporting workflows.
+   - **Pioneered Advanced Testing Solutions:** I created a **comparison engine** for Testplan that performs detailed comparisons between actual and expected trade data. This provided the QA team with a more reliable method to ensure accuracy during regression and integration tests, significantly reducing post-production issues.
+   - **Delivered on High-Stakes Deadlines:** I successfully delivered on critical projects such as the **EMIR 3 EU TR and UK TR go-live mandates**, ensuring seamless implementation and compliance, which helped avoid regulatory penalties and positively impacted the company’s operational risk and compliance status.
+   - **Empowered Regulatory Teams:** Through the development of the **trade cloning tool** and **Power BI reports**, I empowered teams working on different regulatory mandates to perform complex testing and analysis autonomously, improving productivity and accuracy across the board.
+   - **Impact on Strategic Decisions:** The tools and solutions I’ve built (Power BI reports, Testplan database, and AI/ML POC) have provided data and insights that were used to **drive strategic decisions**, influencing both project directions and long-term regulatory strategies.
+   - **Continuous Improvement Culture:** I consistently identified areas for improvement, executing initiatives such as automating parts of the **Testplan process** and integrating Erebus into Testplan, leading to faster turnaround times and a more efficient testing process.
 
-# Example usage
-comparison_df = pd.DataFrame({
-    'Result_1': ['pass', 'fail', 'pending delivery', 'blocked', 'day2', 'pass'],
-    'Result_2': ['fail', 'pass', 'pending delivery', 'day2', 'blocked', 'pass'],
-    'Expected_EventType': ['newt', 'old', 'newt', 'newt', 'old', 'newt'],
-    'Expectedproduct': ['nonexotic', 'nonexotic', 'exotic', 'exotic', 'nonexotic', 'exotic'],
-    'Other_Column': [1, 2, 3, 4, 5, 6]
-})
+This version highlights your contributions in the first person, which will make it more personal and impactful in your 360 evaluation.
 
-result_counts = count_result_values_by_event_type_and_product(comparison_df)
-print(result_counts)
+
+Here’s the **Risk and Controls** section in the first-person format:
+
+### 2. **Risk and Controls:**
+   - **Ensured Data Accuracy with Trade Cloning Tool:** I developed a new **trade cloning tool** with advanced features for cloning trades, which significantly reduced risks associated with manual testing by automating the process. This tool removed dependencies on external databases like Reflow DB and replaced legacy tools, leading to more reliable and consistent results.
+   - **Enhanced Regulatory Accuracy:** By building the **comparison engine** for Testplan, I ensured detailed comparisons between actual and expected trade data, allowing for early detection of discrepancies. This reduced the risk of incorrect trade reporting and helped ensure compliance with regulatory requirements.
+   - **Reduced Operational Risk in Testing:** I streamlined regression testing by implementing a **unified trade cloning tool**, replacing the Purge-Reflow and earlier cloning tools. This minimized potential errors and reduced reliance on outdated scripts, enhancing the reliability of the testing process.
+   - **Implemented AI-Driven Error Correction:** Through the **AI/ML auto-healing POC**, I took a proactive approach to mitigating data errors by introducing automated correction for trade input data. This reduced manual intervention and decreased the likelihood of human errors, enhancing data quality and compliance.
+   - **Maintained Hygiene with Sentinel Tool:** I actively contributed to the maintenance of the **Sentinel tool**, which addressed hygiene issues in our systems. By keeping the tool updated and ensuring that issues were resolved promptly, I minimized potential system failures or inaccuracies, ensuring consistent performance.
+   - **Ensured Robust Test Data Management:** By creating a **comprehensive database for Testplan**, I enabled the team to store input and output data, execution details, and field-level information. This system of record significantly improved traceability and control over test cases, reducing the risk of mismanagement or data loss.
+   - **Improved Risk Control During Regulatory Deadlines:** I ensured a smooth and risk-free go-live during high-stakes projects like **EMIR 3 EU TR and UK TR mandates**, mitigating the potential risk of non-compliance and operational failures by ensuring that all processes were tested, automated, and optimized for accuracy.
+
+These points will highlight your proactive contributions to risk management and control in your 360 evaluation, emphasizing how your work has mitigated risks, improved accuracy, and enhanced system reliability.
+
+
+Here’s the **Culture and Values** section in first-person format:
+
+### 3. **Culture and Values:**
+   - **Led by Example:** I took on leadership responsibilities by **leading the team**, conducting regular **scrum calls**, and ensuring team members understood project goals and their individual tasks. By maintaining clear communication and providing support, I fostered a collaborative and high-performing team environment.
+   - **Mentored and Developed Junior Team Members:** I played an active role in **mentoring Yagna**, an intern, helping him successfully complete his project and develop his skills. This not only strengthened the team but also contributed to the company's culture of learning and growth.
+   - **Promoted Collaboration Across Teams:** By leading cross-functional efforts on **Power BI**, **AI/ML**, and regulatory projects, I encouraged open communication and teamwork between different teams, ensuring alignment with broader company goals.
+   - **Demonstrated Ownership and Accountability:** I consistently took ownership of critical tasks, from regulatory go-live mandates to tool development and automation, demonstrating reliability and a strong sense of responsibility in delivering high-quality work.
+   - **Fostered Innovation and Continuous Improvement:** I actively contributed to a culture of innovation by spearheading initiatives such as the **AI/ML auto-healing POC** and the **Erebus POC**, bringing forward new ideas that drove both technical and business improvements.
+   - **Supported Team Growth and Empowerment:** Through the development of tools like the **trade cloning tool** and **Power BI reports**, I empowered teams to perform complex tasks autonomously, promoting a culture of efficiency, self-reliance, and continuous learning.
+   - **Emphasized Integrity and Excellence:** I worked closely with the team to ensure high standards of work, especially in regulatory reporting, where accuracy and integrity are critical. By always focusing on delivering error-free, compliant solutions, I contributed to the company’s reputation for excellence.
+   - **Encouraged Open Communication:** I made it a point to create an environment where team members felt comfortable asking questions, sharing ideas, and seeking help. This openness helped create trust within the team and allowed for the free flow of information, improving collaboration and problem-solving.
+
+These points highlight your commitment to fostering a positive, collaborative, and growth-oriented work culture, showcasing your contributions to upholding the company’s values in your 360 evaluation.
+
+Here’s the **Manager Effectiveness** section in the first-person format:
+
+### 4. **Manager Effectiveness:**
+   - **Led Cross-Functional Teams:** I effectively led cross-functional teams across projects involving **Power BI**, **AI/ML**, and **regulatory mandates**. By ensuring clear communication and alignment across teams, I facilitated seamless collaboration and successful project deliveries.
+   - **Guided the Team with Clarity and Vision:** I took ownership of **scrum calls** and project planning, ensuring the team was always aligned with project goals, timelines, and expectations. I provided clarity on tasks, resolved blockers, and supported the team in delivering high-quality results on time.
+   - **Mentored and Supported Team Members:** I actively mentored team members, including **junior developers** and interns, helping them grow in their roles and successfully complete their projects. By providing guidance and feedback, I ensured their progress and contributed to building a strong, well-rounded team.
+   - **Fostered Accountability and Ownership:** I promoted a sense of ownership within the team by encouraging individuals to take responsibility for their work and supported them in overcoming challenges. This approach helped build a high-performing team that consistently delivered on complex tasks.
+   - **Proactively Managed Project Risks:** I ensured risks were identified early and addressed effectively in high-stakes projects like **EMIR 3 EU TR, EMIR 3 UK TR, ASIC TR, and MAS TR go-live mandates**, leading to successful and timely go-lives. I also mitigated risks by streamlining processes, such as automating trade cloning and regression testing.
+   - **Encouraged Open Communication and Problem Solving:** I created an environment where team members felt comfortable discussing issues and seeking guidance. By fostering a collaborative atmosphere, I enabled the team to solve problems more effectively and make informed decisions.
+   - **Balanced Technical and Leadership Responsibilities:** While leading the team, I also contributed technically by building tools like the **trade cloning tool** and the **comparison engine** for Testplan. This balance allowed me to provide hands-on support to the team while driving project success from a management perspective.
+   - **Set Clear Goals and Expectations:** I established clear, measurable goals for each team member, ensuring they understood their responsibilities and how their work aligned with the broader objectives of the project and organization. This approach helped maintain focus and accountability across the team.
+   - **Delivered Results Under Pressure:** I successfully managed the team to deliver on complex, high-stakes projects under tight deadlines, such as the **HUTI implementation** and the **Erebus POC**, while maintaining a high standard of quality and precision.
+
+These points will emphasize your managerial strengths, including leadership, mentoring, communication, and your ability to deliver results, in your 360 evaluation.
+
+Here’s the **Professional Development** section in the first-person format:
+
+### 5. **Professional Development:**
+   - **Enhanced Technical Skills in Python and Databases:** I dedicated time to improving my **Python** skills, enabling me to write more efficient and optimized code for data processing and analysis. I also deepened my knowledge of **database management** and SQL, allowing me to handle complex queries and maintain data integrity effectively.
+   - **Gained Expertise in Messaging Queues:** I explored and implemented **message queue** systems, which improved data flow and communication between various components of our applications. This knowledge has been instrumental in developing more resilient and scalable systems.
+   - **Expanded Cloud Computing Proficiency:** I enhanced my understanding of **cloud technologies**, which has allowed me to deploy solutions in cloud environments effectively. This knowledge supports our team’s initiatives in leveraging cloud resources for better scalability and availability of applications.
+   - **Advanced Skills in Power BI:** I invested time in mastering **Power BI**, enabling me to create complex dashboards and reports that provide actionable insights for stakeholders. My ability to visualize data effectively has enhanced our team’s reporting capabilities across various mandates.
+   - **Deepened Understanding of Trade Workflows:** I improved my knowledge of business workflows related to **trade booking, confirmation, and validation**. This understanding has allowed me to develop solutions that align with regulatory requirements and enhance operational efficiency.
+   - **Participated in Training and Workshops:** I actively sought out training sessions and workshops related to data analytics, machine learning, and regulatory reporting. These opportunities not only expanded my technical expertise but also kept me updated on industry trends and best practices.
+   - **Applied New Skills to Real-World Projects:** I applied my technical skills in projects such as the **AI/ML POC for auto-healing trade input data** and the development of the **comparison engine** for Testplan. This practical application reinforced my learning and contributed to project success.
+   - **Contributed to Knowledge Sharing:** I made it a point to share my learning and insights with my team, whether through informal discussions or structured knowledge-sharing sessions. This fostered a culture of continuous learning and improvement within the team.
+   - **Set Personal Development Goals:** I established personal development goals related to technical skills and business knowledge, regularly evaluating my progress and adjusting my learning path to ensure alignment with team and organizational objectives.
+
+
+
+aa
+
+isk and Control
+aa needs to improve her adherence to risk and control practices. She should develop a more structured approach to her work, ensuring all tasks are completed within the designated timelines to mitigate risks associated with delays. Taking ownership of her tasks and being accountable for her deliverables will help strengthen risk management.
+
+Culture and Values
+aa should focus on aligning with the team's culture and values. Her limited involvement within the group hinders team cohesion. She needs to engage more actively in team activities and communication channels, demonstrating a commitment to collaboration and mutual support. This will enhance team dynamics and ensure everyone is on the same page.
+
+
+aa is assigned to me as a co-direct, so there's nothing to say about her manager effectiveness skills.
+
+rrr
+You
+you have just copy pasteds same line
+Copilot
+Here's a more cohesive version:
+
+Risk and Control
+rr shows a proactive approach in understanding requirements and associated risks, which is a great strength. While he occasionally moves forward without team discussions, his intent is always to deliver swiftly and efficiently. By involving the team more in the decision-making process, he can enhance solution quality even further. Additionally, Roberto has been instrumental in the development of PowerBI and Erebus, showcasing his commitment to delivering high-quality solutions. Overall, Roberto is performing well and I am happy to work with him.
+
+Culture and Values
+rr’s eagerness to help others is a valuable asset, fostering a supportive and collaborative environment. His proactive nature shows his dedication to the team's success. By prioritizing team communication and collaboration, he can align his work even better with the group's culture and values. Roberto's contributions to the development of PowerBI and Erebus demonstrate his commitment to our collective goals. Overall, Roberto is performing well and I am happy to work with him.
+
+cc
+Risk and Control
+cc has a solid understanding of requirements and consistently delivers on time. She asks the right questions to ensure clarity and completeness, making sure to join calls and stay informed about project progress. Her proactive approach helps manage risks effectively. Additionally, Chloe has contributed significantly to TDD development, showcasing her commitment to high-quality solutions.
+
+Culture and Values
+cc embodies the team's culture and values by actively participating in calls and understanding project developments. Her proactive communication ensures everyone is on the same page, fostering a collaborative environment. Her contributions to TDD development highlight her dedication to the team's success. Overall, Chloe is performing excellently, and it's a pleasure to work with her.
+
+bb
+Risk and Control
+bb has a firm grasp on business requirements and takes decisive action. His contributions to EQS and EQD for HUTI confirmation delivery highlight his ability to manage and mitigate risks effectively. Bibhuti's availability to assist with any queries ensures that potential issues are addressed promptly, contributing to a smooth workflow. Additionally, his involvement in regression delivery showcases his dedication to maintaining high-quality standards.
+
+Culture and Values
+bb embodies the team's culture and values by being readily available to help with any queries and ensuring smooth project execution. His proactive communication and willingness to assist others foster a collaborative and supportive team environment. His contributions to EQS and EQD for HUTI confirmation delivery, as well as regression delivery, demonstrate his commitment to the team's success and overall goals. Bibhuti's consistent efforts make him a valuable team member.
+
+tt
+Here are some pointers you can include in the 360 evaluation for your manager, tt, categorized by risk and controls, culture and values, and manager effectiveness:
+
+### Risk and Controls
+1. **Proactive Risk Management**: tt identifies potential risks early in the project lifecycle and engages the team in discussions to mitigate them.
+2. **Clear Communication**: She effectively communicates the risks associated with projects to the team, ensuring everyone is aligned and prepared.
+3. **Supportive Oversight**: She provides guidance on implementing controls, ensuring the team understands compliance requirements and quality standards.
+4. **Encourages Accountability**: tt promotes a culture of accountability by ensuring team members understand their responsibilities related to risk management.
+
+### Culture and Values
+1. **Inclusive Leadership**: She fosters an inclusive environment where team members feel comfortable sharing ideas and concerns.
+2. **Encouragement of Collaboration**: tt emphasizes collaboration between the automation team and functional QAs, enhancing team cohesion.
+3. **Commitment to Growth**: She encourages continuous learning and development among team members, supporting their professional growth.
+4. **Recognition of Contributions**: She acknowledges and appreciates the efforts and successes of the team, enhancing morale and motivation.
+
+### Manager Effectiveness
+1. **Supportive Guidance**: tt offers support on projects, helping team members navigate challenges.
+2. **Strategic Decision-Making**: She makes informed decisions that balance the needs of the automation team and functional QAs, optimizing project outcomes.
+3. **Responsive and Approachable**: Team members find her approachable, creating a safe space for raising concerns or seeking advice.
+4. **Balanced Feedback**: tt provides constructive feedback that helps team members improve while also recognizing their strengths.
+
+
