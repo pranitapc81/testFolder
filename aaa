@@ -1,23 +1,42 @@
+# First, create a file named person.proto with this content:
+"""
+syntax = "proto3";
+
+package example;
+
+message Person {
+    string name = 1;
+    Address address = 2;
+    repeated PhoneNumber phones = 3;
+}
+
+message Address {
+    string street = 1;
+    string city = 2;
+    string country = 3;
+}
+
+message PhoneNumber {
+    string number = 1;
+    PhoneType type = 2;
+}
+
+enum PhoneType {
+    MOBILE = 0;
+    HOME = 1;
+    WORK = 2;
+}
+"""
+
+# Save this as main.py:
 from google.protobuf.descriptor import FieldDescriptor
 from typing import Any, List, Union
+import person_pb2  # This will be generated from person.proto
 
 def update_protobuf_value(message: Any, path: Union[str, List[str]], new_value: Any) -> bool:
     """
     Update a value in a protobuf message using a path string or list of path components.
-    
-    Args:
-        message: The protobuf message to update
-        path: Either a dot-separated string path or list of path components
-        new_value: The new value to set at the specified path
-    
-    Returns:
-        bool: True if update was successful, False otherwise
-    
-    Example:
-        update_protobuf_value(msg, "person.address.street", "New Street")
-        update_protobuf_value(msg, ["person", "address", "street"], "New Street")
     """
-    # Convert string path to list if needed
     if isinstance(path, str):
         path_parts = path.split('.')
     else:
@@ -25,22 +44,18 @@ def update_protobuf_value(message: Any, path: Union[str, List[str]], new_value: 
     
     current = message
     for i, part in enumerate(path_parts):
-        # Handle repeated fields
         array_index = None
         if '[' in part and ']' in part:
             part, index_str = part.split('[')
             array_index = int(index_str.rstrip(']'))
             
-        # Get field descriptor
         field = current.DESCRIPTOR.fields_by_name.get(part)
         if not field:
             return False
             
-        # Handle last part of path (setting the value)
         if i == len(path_parts) - 1:
             try:
                 if array_index is not None:
-                    # Handle repeated field
                     repeated_field = getattr(current, part)
                     if array_index >= len(repeated_field):
                         return False
@@ -49,7 +64,6 @@ def update_protobuf_value(message: Any, path: Union[str, List[str]], new_value: 
                     else:
                         repeated_field[array_index] = new_value
                 else:
-                    # Handle non-repeated field
                     if field.type == FieldDescriptor.TYPE_MESSAGE:
                         getattr(current, part).CopyFrom(new_value)
                     else:
@@ -58,7 +72,6 @@ def update_protobuf_value(message: Any, path: Union[str, List[str]], new_value: 
             except (TypeError, ValueError):
                 return False
         
-        # Navigate to next level
         if array_index is not None:
             repeated_field = getattr(current, part)
             if array_index >= len(repeated_field):
@@ -69,31 +82,44 @@ def update_protobuf_value(message: Any, path: Union[str, List[str]], new_value: 
     
     return False
 
-# Example usage with a sample protobuf message
-def example_usage():
-    # Assuming you have a protobuf message like:
-    """
-    message Person {
-        string name = 1;
-        Address address = 2;
-        repeated PhoneNumber phones = 3;
-    }
+def main():
+    # Create a new Person message
+    person = person_pb2.Person()
     
-    message Address {
-        string street = 1;
-        string city = 2;
-    }
+    # Set initial values
+    person.name = "John Doe"
+    person.address.street = "123 Old Street"
+    person.address.city = "Old City"
+    person.address.country = "Old Country"
     
-    message PhoneNumber {
-        string number = 1;
-        PhoneType type = 2;
-    }
-    """
+    # Add two phone numbers
+    phone1 = person.phones.add()
+    phone1.number = "555-1111"
+    phone1.type = person_pb2.PhoneType.MOBILE
     
-    # Example updates
-    update_protobuf_value(person_msg, "name", "John Doe")
-    update_protobuf_value(person_msg, "address.street", "123 Main St")
-    update_protobuf_value(person_msg, "phones[0].number", "555-1234")
+    phone2 = person.phones.add()
+    phone2.number = "555-2222"
+    phone2.type = person_pb2.PhoneType.HOME
     
-    # Using path as list
-    update_protobuf_value(person_msg, ["address", "city"], "New York")
+    # Print initial state
+    print("Initial state:")
+    print(person)
+    print("\n" + "="*50 + "\n")
+    
+    # Demonstrate different types of updates
+    updates = [
+        ("name", "Jane Smith"),
+        ("address.street", "456 New Street"),
+        ("address.city", "New City"),
+        ("phones[0].number", "555-3333"),
+        (["phones", "1", "type"], person_pb2.PhoneType.WORK)
+    ]
+    
+    for path, value in updates:
+        success = update_protobuf_value(person, path, value)
+        print(f"Update {path} -> {value}: {'Success' if success else 'Failed'}")
+        print(person)
+        print("\n" + "="*50 + "\n")
+
+if __name__ == "__main__":
+    main()
