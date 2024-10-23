@@ -1,220 +1,186 @@
-from google.protobuf import descriptor_pb2
-from google.protobuf import message_factory
-from google.protobuf import descriptor_pool
+from google.protobuf.internal import decoder, encoder, wire_format
 from google.protobuf.message import Message
-from typing import Any, Dict, List, Optional
+from google.protobuf import descriptor_pool
+from google.protobuf import message_factory
+from typing import Any, Dict, List, Optional, Tuple
 import struct
+import binascii
 
-class DynamicGpbHandler:
+class DirectGpbHandler:
     def __init__(self):
-        self.pool = descriptor_pool.Default()
-        self.message_factory = message_factory.MessageFactory()
+        """Initialize the GPB handler"""
+        self.pool = descriptor_pool.DescriptorPool()
+        self.message_factory = message_factory.MessageFactory(self.pool)
+
+    def read_raw_message(self, file_path: str) -> bytes:
+        """Read raw bytes from GPB file"""
+        with open(file_path, 'rb') as f:
+            return f.read()
+
+    def parse_raw_fields(self, raw_data: bytes) -> List[Tuple[int, int, bytes]]:
+        """
+        Parse raw protobuf fields without knowing the message type.
+        Returns list of (field_number, wire_type, value) tuples.
+        """
+        pos = 0
+        length = len(raw_data)
+        fields = []
         
-    def _try_get_message_type(self, binary_data: bytes) -> Optional[Message]:
-        """
-        Attempt to determine message type from binary data.
-        This is a heuristic approach as .gpb files don't store the message type name.
-        """
-        try:
-            # Try to get the first field tag and wire type
-            tag_bytes = binary_data[:1]
-            if not tag_bytes:
-                return None
+        while pos < length:
+            try:
+                tag, new_pos = decoder._DecodeVarint(raw_data, pos)
+                field_number, wire_type = wire_format.UnpackTag(tag)
+                pos = new_pos
                 
-            # Get the field number and wire type
-            tag = struct.unpack('B', tag_bytes)[0]
-            field_number = tag >> 3
-            
-            # Look through the pool for matching descriptors
-            for message_name in self.pool.FindFileByName('descriptor.proto').message_types_by_name:
+                if wire_type == wire_format.WIRETYPE_VARINT:
+                    value, new_pos = decoder._DecodeVarint(raw_data, pos)
+                    value_bytes = raw_data[pos:new_pos]
+                elif wire_type == wire_format.WIRETYPE_FIXED64:
+                    value_bytes = raw_data[pos:pos + 8]
+                    new_pos = pos + 8
+                elif wire_type == wire_format.WIRETYPE_LENGTH_DELIMITED:
+                    size, pos = decoder._DecodeVarint(raw_data, pos)
+                    value_bytes = raw_data[pos:pos + size]
+                    new_pos = pos + size
+                elif wire_type == wire_format.WIRETYPE_FIXED32:
+                    value_bytes = raw_data[pos:pos + 4]
+                    new_pos = pos + 4
+                else:
+                    print(f"Unknown wire type: {wire_type}")
+                    break
+                
+                fields.append((field_number, wire_type, value_bytes))
+                pos = new_pos
+                
+            except Exception as e:
+                print(f"Error parsing at position {pos}: {str(e)}")
+                break
+                
+        return fields
+
+    def decode_value(self, wire_type: int, value_bytes: bytes) -> Any:
+        """Decode value based on wire type"""
+        try:
+            if wire_type == wire_format.WIRETYPE_VARINT:
+                value, _ = decoder._DecodeVarint(value_bytes, 0)
+                return value
+            elif wire_type == wire_format.WIRETYPE_FIXED64:
+                return struct.unpack('<Q', value_bytes)[0]
+            elif wire_type == wire_format.WIRETYPE_LENGTH_DELIMITED:
                 try:
-                    message_descriptor = self.pool.FindMessageTypeByName(message_name)
-                    if field_number in message_descriptor.fields_by_number:
-                        return self.message_factory.GetPrototype(message_descriptor)
-                except Exception:
-                    continue
-                    
-        except Exception as e:
-            print(f"Error in type detection: {str(e)}")
-        return None
-
-    def read_gpb_file(self, file_path: str) -> Optional[Message]:
-        """
-        Read a .gpb file and attempt to parse it dynamically.
-        
-        Args:
-            file_path: Path to the .gpb file
-            
-        Returns:
-            Parsed protobuf message or None if parsing fails
-        """
-        try:
-            # Read the binary data
-            with open(file_path, 'rb') as f:
-                binary_data = f.read()
-            
-            print(f"Read {len(binary_data)} bytes from {file_path}")
-            
-            # Try to determine message type
-            message_type = self._try_get_message_type(binary_data)
-            if not message_type:
-                raise ValueError("Could not determine message type from binary data")
-            
-            # Parse the message
-            message = message_type()
-            message.ParseFromString(binary_data)
-            return message
-            
-        except Exception as e:
-            print(f"Error reading GPB file: {str(e)}")
-            return None
-
-    def print_message_content(self, message: Message, indent: int = 0):
-        """
-        Print the content of a protobuf message recursively.
-        
-        Args:
-            message: Protobuf message to print
-            indent: Indentation level
-        """
-        for field_descriptor, value in message.ListFields():
-            prefix = '  ' * indent
-            if field_descriptor.type == descriptor_pb2.FieldDescriptor.TYPE_MESSAGE:
-                print(f"{prefix}{field_descriptor.name}: {{")
-                if field_descriptor.label == descriptor_pb2.FieldDescriptor.LABEL_REPEATED:
-                    for item in value:
-                        self.print_message_content(item, indent + 1)
-                else:
-                    self.print_message_content(value, indent + 1)
-                print(f"{prefix}}}")
+                    # Try to decode as UTF-8 string
+                    return value_bytes.decode('utf-8')
+                except UnicodeDecodeError:
+                    # If not a string, return hex representation
+                    return binascii.hexlify(value_bytes).decode('ascii')
+            elif wire_type == wire_format.WIRETYPE_FIXED32:
+                return struct.unpack('<I', value_bytes)[0]
             else:
-                if field_descriptor.label == descriptor_pb2.FieldDescriptor.LABEL_REPEATED:
-                    print(f"{prefix}{field_descriptor.name}: {list(value)}")
-                else:
-                    print(f"{prefix}{field_descriptor.name}: {value}")
+                return f"Unknown wire type: {wire_type}"
+        except Exception as e:
+            return f"Error decoding: {str(e)}"
 
-    def update_field_value(self, message: Message, path: str, new_value: Any) -> bool:
-        """
-        Update a field value in the message using a path.
+    def print_gpb_content(self, file_path: str):
+        """Print the content of a GPB file"""
+        raw_data = self.read_raw_message(file_path)
+        fields = self.parse_raw_fields(raw_data)
         
-        Args:
-            message: The protobuf message to update
-            path: Dot-separated path to the field
-            new_value: New value to set
+        print(f"\nGPB File Content ({file_path}):")
+        print("-" * 50)
+        for field_number, wire_type, value_bytes in fields:
+            decoded_value = self.decode_value(wire_type, value_bytes)
+            wire_type_name = {
+                0: "VARINT",
+                1: "FIXED64",
+                2: "LENGTH_DELIMITED",
+                5: "FIXED32"
+            }.get(wire_type, f"UNKNOWN({wire_type})")
             
-        Returns:
-            bool: True if update was successful
+            print(f"Field {field_number}:")
+            print(f"  Wire Type: {wire_type_name}")
+            print(f"  Value: {decoded_value}")
+            print("-" * 50)
+
+    def modify_field(self, raw_data: bytes, field_number: int, new_value: Any) -> bytes:
         """
-        try:
-            current = message
-            path_parts = path.split('.')
-            
-            # Navigate to the final container
-            for i, part in enumerate(path_parts[:-1]):
-                if '[' in part and ']' in part:
-                    field_name, index_str = part.split('[')
-                    index = int(index_str.rstrip(']'))
-                    current = getattr(current, field_name)[index]
+        Modify a field in the raw protobuf data.
+        Returns modified protobuf data.
+        """
+        fields = self.parse_raw_fields(raw_data)
+        new_data = bytearray()
+        
+        for curr_field_number, wire_type, value_bytes in fields:
+            if curr_field_number == field_number:
+                # Encode new value based on wire type
+                if wire_type == wire_format.WIRETYPE_VARINT:
+                    tag = encoder.TagBytes(field_number, wire_type)
+                    new_data.extend(tag)
+                    new_data.extend(encoder._VarintBytes(new_value))
+                elif wire_type == wire_format.WIRETYPE_LENGTH_DELIMITED:
+                    if isinstance(new_value, str):
+                        value_bytes = new_value.encode('utf-8')
+                    else:
+                        value_bytes = new_value
+                    tag = encoder.TagBytes(field_number, wire_type)
+                    new_data.extend(tag)
+                    new_data.extend(encoder._VarintBytes(len(value_bytes)))
+                    new_data.extend(value_bytes)
                 else:
-                    current = getattr(current, part)
-            
-            # Set the final field
-            last_part = path_parts[-1]
-            if '[' in last_part and ']' in last_part:
-                field_name, index_str = last_part.split('[')
-                index = int(index_str.rstrip(']'))
-                repeated_field = getattr(current, field_name)
-                repeated_field[index] = new_value
+                    # For unsupported types, keep original
+                    tag = encoder.TagBytes(field_number, wire_type)
+                    new_data.extend(tag)
+                    new_data.extend(value_bytes)
             else:
-                setattr(current, last_part, new_value)
-            
-            return True
-            
-        except Exception as e:
-            print(f"Error updating field at path {path}: {str(e)}")
-            return False
-
-    def save_gpb_file(self, message: Message, file_path: str) -> bool:
-        """
-        Save the updated message back to a .gpb file.
+                # Keep original field unchanged
+                tag = encoder.TagBytes(curr_field_number, wire_type)
+                new_data.extend(tag)
+                new_data.extend(value_bytes)
         
-        Args:
-            message: The protobuf message to save
-            file_path: Path where to save the file
-            
-        Returns:
-            bool: True if save was successful
-        """
-        try:
-            with open(file_path, 'wb') as f:
-                f.write(message.SerializeToString())
-            return True
-        except Exception as e:
-            print(f"Error saving GPB file: {str(e)}")
-            return False
+        return bytes(new_data)
 
-# Example usage
-def main():
+def example_usage():
+    """Example of how to use the DirectGpbHandler"""
     # Create handler
-    handler = DynamicGpbHandler()
+    handler = DirectGpbHandler()
     
-    # Read the .gpb file
-    gpb_file_path = "your_file.gpb"  # Replace with your .gpb file path
-    message = handler.read_gpb_file(gpb_file_path)
+    # Read and print GPB content
+    gpb_file = "your_file.gpb"  # Replace with your file path
+    print("\nReading original GPB file...")
+    handler.print_gpb_content(gpb_file)
     
-    if message:
-        print("\nOriginal message content:")
-        handler.print_message_content(message)
-        
-        # Example updates
-        updates = [
-            {"path": "field1", "value": "new_value"},
-            {"path": "nested.field", "value": 42},
-            {"path": "repeated_field[0]", "value": "updated"}
-        ]
-        
-        # Apply updates
-        for update in updates:
-            success = handler.update_field_value(message, update["path"], update["value"])
-            print(f"\nUpdate {update['path']}: {'Success' if success else 'Failed'}")
-        
-        # Save updated message
-        output_file = "updated_file.gpb"
-        if handler.save_gpb_file(message, output_file):
-            print(f"\nSaved updated message to {output_file}")
-            
-            # Print updated content
-            print("\nUpdated message content:")
-            updated_message = handler.read_gpb_file(output_file)
-            if updated_message:
-                handler.print_message_content(updated_message)
-    else:
-        print("Failed to read GPB file")
+    # Modify a field
+    print("\nModifying field...")
+    raw_data = handler.read_raw_message(gpb_file)
+    
+    # Example: modify field number 1 with new value
+    field_to_modify = 1
+    new_value = 42  # Replace with your new value
+    modified_data = handler.modify_field(raw_data, field_to_modify, new_value)
+    
+    # Save modified data
+    output_file = "modified.gpb"
+    with open(output_file, 'wb') as f:
+        f.write(modified_data)
+    
+    print(f"\nModified GPB saved to {output_file}")
+    print("\nReading modified GPB file...")
+    handler.print_gpb_content(output_file)
 
 if __name__ == "__main__":
-    main()
+    example_usage()
 
-# Create the handler
-handler = DynamicGpbHandler()
 
-# Read your .gpb file
+# Create handler
+handler = DirectGpbHandler()
+
+# Read and display your GPB file content
 gpb_file = "path/to/your/file.gpb"
-message = handler.read_gpb_file(gpb_file)
+handler.print_gpb_content(gpb_file)
 
-# Print the current content to see the structure
-if message:
-    print("Message content:")
-    handler.print_message_content(message)
-    
-    # Define your updates
-    updates = [
-        {"path": "some_field", "value": "new_value"},
-        {"path": "nested.field", "value": 42}
-    ]
-    
-    # Apply updates
-    for update in updates:
-        handler.update_field_value(message, update["path"], update["value"])
-    
-    # Save the updated message
-    handler.save_gpb_file(message, "updated_file.gpb")
+# To modify a field:
+raw_data = handler.read_raw_message(gpb_file)
+modified_data = handler.modify_field(raw_data, field_number=1, new_value="new value")
+
+# Save modified data
+with open("modified.gpb", "wb") as f:
+    f.write(modified_data)
