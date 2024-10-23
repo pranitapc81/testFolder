@@ -1,51 +1,101 @@
-from google.protobuf.descriptor import FieldDescriptor
+from google.protobuf import descriptor_pb2
+from google.protobuf import message_factory
+from google.protobuf import descriptor_pool
 from google.protobuf.message import Message
-from google.protobuf.json_format import MessageToDict, ParseDict
-from typing import Any, List, Dict, Type, Union
-import os
+from typing import Any, Dict, List, Optional
+import struct
 
-class GpbFileUpdater:
-    def __init__(self, message_type: Type[Message]):
-        """
-        Initialize updater with the protobuf message type.
+class DynamicGpbHandler:
+    def __init__(self):
+        self.pool = descriptor_pool.Default()
+        self.message_factory = message_factory.MessageFactory()
         
-        Args:
-            message_type: The type of protobuf message (e.g., YourProto_pb2.YourMessage)
+    def _try_get_message_type(self, binary_data: bytes) -> Optional[Message]:
         """
-        self.message_type = message_type
-    
-    def read_gpb_file(self, file_path: str) -> Message:
+        Attempt to determine message type from binary data.
+        This is a heuristic approach as .gpb files don't store the message type name.
         """
-        Read a .gpb file and parse it into a protobuf message.
+        try:
+            # Try to get the first field tag and wire type
+            tag_bytes = binary_data[:1]
+            if not tag_bytes:
+                return None
+                
+            # Get the field number and wire type
+            tag = struct.unpack('B', tag_bytes)[0]
+            field_number = tag >> 3
+            
+            # Look through the pool for matching descriptors
+            for message_name in self.pool.FindFileByName('descriptor.proto').message_types_by_name:
+                try:
+                    message_descriptor = self.pool.FindMessageTypeByName(message_name)
+                    if field_number in message_descriptor.fields_by_number:
+                        return self.message_factory.GetPrototype(message_descriptor)
+                except Exception:
+                    continue
+                    
+        except Exception as e:
+            print(f"Error in type detection: {str(e)}")
+        return None
+
+    def read_gpb_file(self, file_path: str) -> Optional[Message]:
+        """
+        Read a .gpb file and attempt to parse it dynamically.
         
         Args:
             file_path: Path to the .gpb file
             
         Returns:
-            Parsed protobuf message
+            Parsed protobuf message or None if parsing fails
         """
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"GPB file not found: {file_path}")
+        try:
+            # Read the binary data
+            with open(file_path, 'rb') as f:
+                binary_data = f.read()
             
-        message = self.message_type()
-        with open(file_path, 'rb') as f:
-            message.ParseFromString(f.read())
-        return message
-    
-    def write_gpb_file(self, message: Message, file_path: str):
+            print(f"Read {len(binary_data)} bytes from {file_path}")
+            
+            # Try to determine message type
+            message_type = self._try_get_message_type(binary_data)
+            if not message_type:
+                raise ValueError("Could not determine message type from binary data")
+            
+            # Parse the message
+            message = message_type()
+            message.ParseFromString(binary_data)
+            return message
+            
+        except Exception as e:
+            print(f"Error reading GPB file: {str(e)}")
+            return None
+
+    def print_message_content(self, message: Message, indent: int = 0):
         """
-        Write a protobuf message to a .gpb file.
+        Print the content of a protobuf message recursively.
         
         Args:
-            message: The protobuf message to write
-            file_path: Path where to save the .gpb file
+            message: Protobuf message to print
+            indent: Indentation level
         """
-        with open(file_path, 'wb') as f:
-            f.write(message.SerializeToString())
-    
-    def update_value(self, message: Message, path: str, new_value: Any) -> bool:
+        for field_descriptor, value in message.ListFields():
+            prefix = '  ' * indent
+            if field_descriptor.type == descriptor_pb2.FieldDescriptor.TYPE_MESSAGE:
+                print(f"{prefix}{field_descriptor.name}: {{")
+                if field_descriptor.label == descriptor_pb2.FieldDescriptor.LABEL_REPEATED:
+                    for item in value:
+                        self.print_message_content(item, indent + 1)
+                else:
+                    self.print_message_content(value, indent + 1)
+                print(f"{prefix}}}")
+            else:
+                if field_descriptor.label == descriptor_pb2.FieldDescriptor.LABEL_REPEATED:
+                    print(f"{prefix}{field_descriptor.name}: {list(value)}")
+                else:
+                    print(f"{prefix}{field_descriptor.name}: {value}")
+
+    def update_field_value(self, message: Message, path: str, new_value: Any) -> bool:
         """
-        Update a single value in the protobuf message.
+        Update a field value in the message using a path.
         
         Args:
             message: The protobuf message to update
@@ -56,8 +106,8 @@ class GpbFileUpdater:
             bool: True if update was successful
         """
         try:
-            path_parts = path.split('.')
             current = message
+            path_parts = path.split('.')
             
             # Navigate to the final container
             for i, part in enumerate(path_parts[:-1]):
@@ -68,7 +118,7 @@ class GpbFileUpdater:
                 else:
                     current = getattr(current, part)
             
-            # Handle the final field
+            # Set the final field
             last_part = path_parts[-1]
             if '[' in last_part and ']' in last_part:
                 field_name, index_str = last_part.split('[')
@@ -79,133 +129,92 @@ class GpbFileUpdater:
                 setattr(current, last_part, new_value)
             
             return True
+            
         except Exception as e:
-            print(f"Failed to update path {path}: {str(e)}")
+            print(f"Error updating field at path {path}: {str(e)}")
             return False
-    
-    def update_gpb_file(self, input_file: str, updates: List[Dict[str, Any]], output_file: str = None) -> bool:
+
+    def save_gpb_file(self, message: Message, file_path: str) -> bool:
         """
-        Read a .gpb file, apply updates, and save the result.
+        Save the updated message back to a .gpb file.
         
         Args:
-            input_file: Path to input .gpb file
-            updates: List of dictionaries with 'path' and 'value' keys
-            output_file: Path to save updated .gpb file (defaults to input_file)
+            message: The protobuf message to save
+            file_path: Path where to save the file
             
         Returns:
-            bool: True if all updates were successful
+            bool: True if save was successful
         """
         try:
-            # Read the message
-            message = self.read_gpb_file(input_file)
-            
-            # Apply all updates
-            success = True
-            for update in updates:
-                if not self.update_value(message, update['path'], update['value']):
-                    success = False
-            
-            # Write the updated message
-            output_path = output_file or input_file
-            self.write_gpb_file(message, output_path)
-            
-            return success
+            with open(file_path, 'wb') as f:
+                f.write(message.SerializeToString())
+            return True
         except Exception as e:
-            print(f"Failed to process GPB file: {str(e)}")
+            print(f"Error saving GPB file: {str(e)}")
             return False
-    
-    def print_message_structure(self, message: Message, indent: int = 0):
-        """
-        Print the structure of a protobuf message (helpful for debugging).
-        
-        Args:
-            message: The protobuf message to inspect
-            indent: Current indentation level
-        """
-        for field in message.DESCRIPTOR.fields:
-            prefix = '  ' * indent
-            if field.type == FieldDescriptor.TYPE_MESSAGE:
-                print(f"{prefix}{field.name}: {{")
-                if field.label == FieldDescriptor.LABEL_REPEATED:
-                    if len(getattr(message, field.name)) > 0:
-                        self.print_message_structure(getattr(message, field.name)[0], indent + 1)
-                else:
-                    self.print_message_structure(getattr(message, field.name), indent + 1)
-                print(f"{prefix}}}")
-            else:
-                value = getattr(message, field.name)
-                if field.label == FieldDescriptor.LABEL_REPEATED:
-                    print(f"{prefix}{field.name}: [...]")
-                else:
-                    print(f"{prefix}{field.name}: {value}")
 
-def example_usage():
-    """
-    Example of how to use the GpbFileUpdater.
-    """
-    # Import your generated protobuf module
-    # import your_proto_pb2
+# Example usage
+def main():
+    # Create handler
+    handler = DynamicGpbHandler()
     
-    # Initialize the updater with your message type
-    # updater = GpbFileUpdater(your_proto_pb2.YourMessage)
+    # Read the .gpb file
+    gpb_file_path = "your_file.gpb"  # Replace with your .gpb file path
+    message = handler.read_gpb_file(gpb_file_path)
     
-    # Example updates
+    if message:
+        print("\nOriginal message content:")
+        handler.print_message_content(message)
+        
+        # Example updates
+        updates = [
+            {"path": "field1", "value": "new_value"},
+            {"path": "nested.field", "value": 42},
+            {"path": "repeated_field[0]", "value": "updated"}
+        ]
+        
+        # Apply updates
+        for update in updates:
+            success = handler.update_field_value(message, update["path"], update["value"])
+            print(f"\nUpdate {update['path']}: {'Success' if success else 'Failed'}")
+        
+        # Save updated message
+        output_file = "updated_file.gpb"
+        if handler.save_gpb_file(message, output_file):
+            print(f"\nSaved updated message to {output_file}")
+            
+            # Print updated content
+            print("\nUpdated message content:")
+            updated_message = handler.read_gpb_file(output_file)
+            if updated_message:
+                handler.print_message_content(updated_message)
+    else:
+        print("Failed to read GPB file")
+
+if __name__ == "__main__":
+    main()
+
+# Create the handler
+handler = DynamicGpbHandler()
+
+# Read your .gpb file
+gpb_file = "path/to/your/file.gpb"
+message = handler.read_gpb_file(gpb_file)
+
+# Print the current content to see the structure
+if message:
+    print("Message content:")
+    handler.print_message_content(message)
+    
+    # Define your updates
     updates = [
-        {"path": "field1", "value": "new_value"},
-        {"path": "nested.field", "value": 42},
-        {"path": "repeated_field[0].name", "value": "updated_name"}
+        {"path": "some_field", "value": "new_value"},
+        {"path": "nested.field", "value": 42}
     ]
     
-    # Update the .gpb file
-    # success = updater.update_gpb_file('input.gpb', updates, 'output.gpb')
+    # Apply updates
+    for update in updates:
+        handler.update_field_value(message, update["path"], update["value"])
     
-    # Print result
-    # if success:
-    #     print("GPB file updated successfully")
-    # else:
-    #     print("Some updates failed")
-    pass
-
-# Actual usage example (uncomment and modify with your actual proto):
-"""
-# Assuming you have generated proto file and message type
-import my_proto_pb2
-
-# Initialize updater
-updater = GpbFileUpdater(my_proto_pb2.MyMessage)
-
-# Read and print current structure
-message = updater.read_gpb_file('input.gpb')
-print("Current message structure:")
-updater.print_message_structure(message)
-
-# Define updates
-updates = [
-    {"path": "some_field", "value": "new_value"},
-    {"path": "nested.field", "value": 42},
-    {"path": "repeated_field[0].name", "value": "updated"}
-]
-
-# Apply updates
-success = updater.update_gpb_file('input.gpb', updates, 'output.gpb')
-"""
-
-
-import your_proto_pb2  # Your generated protobuf module
-
-# Initialize updater with your message type
-updater = GpbFileUpdater(your_proto_pb2.YourMessage)
-
-# To see the structure of your current .gpb file:
-message = updater.read_gpb_file('your_file.gpb')
-updater.print_message_structure(message)
-
-# Define your updates
-updates = [
-    {"path": "field_name", "value": "new_value"},
-    {"path": "nested.field", "value": 42},
-    {"path": "repeated_field[0].name", "value": "updated"}
-]
-
-# Apply updates
-success = updater.update_gpb_file('your_file.gpb', updates, 'updated_file.gpb')
+    # Save the updated message
+    handler.save_gpb_file(message, "updated_file.gpb")
