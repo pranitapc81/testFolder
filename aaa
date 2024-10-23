@@ -1,125 +1,186 @@
-# First, create a file named person.proto with this content:
-"""
-syntax = "proto3";
-
-package example;
-
-message Person {
-    string name = 1;
-    Address address = 2;
-    repeated PhoneNumber phones = 3;
-}
-
-message Address {
-    string street = 1;
-    string city = 2;
-    string country = 3;
-}
-
-message PhoneNumber {
-    string number = 1;
-    PhoneType type = 2;
-}
-
-enum PhoneType {
-    MOBILE = 0;
-    HOME = 1;
-    WORK = 2;
-}
-"""
-
-# Save this as main.py:
 from google.protobuf.descriptor import FieldDescriptor
-from typing import Any, List, Union
-import person_pb2  # This will be generated from person.proto
+from google.protobuf.message import Message
+from google.protobuf.json_format import MessageToDict, Parse, ParseDict
+from typing import Any, List, Union, Dict
+import json
 
-def update_protobuf_value(message: Any, path: Union[str, List[str]], new_value: Any) -> bool:
+class DynamicProtobufUpdater:
     """
-    Update a value in a protobuf message using a path string or list of path components.
+    A class to handle dynamic protobuf message updates without knowing the schema in advance.
     """
-    if isinstance(path, str):
-        path_parts = path.split('.')
-    else:
-        path_parts = path
     
-    current = message
-    for i, part in enumerate(path_parts):
+    @staticmethod
+    def get_value_at_path(obj: Union[Dict, Message], path: Union[str, List[str]]) -> Any:
+        """Get value at specified path in either a dict or protobuf message."""
+        if isinstance(path, str):
+            path_parts = path.split('.')
+        else:
+            path_parts = path
+            
+        current = obj
+        for part in path_parts:
+            # Handle array indexing
+            array_index = None
+            if '[' in part and ']' in part:
+                part, index_str = part.split('[')
+                array_index = int(index_str.rstrip(']'))
+            
+            if isinstance(current, Message):
+                if not hasattr(current, part):
+                    raise KeyError(f"Path {part} not found in message")
+                current = getattr(current, part)
+            elif isinstance(current, dict):
+                if part not in current:
+                    raise KeyError(f"Path {part} not found in dict")
+                current = current[part]
+            else:
+                raise ValueError(f"Invalid path: {part}")
+                
+            if array_index is not None:
+                if isinstance(current, (list, tuple)):
+                    current = current[array_index]
+                else:
+                    raise ValueError(f"Cannot index non-sequence at {part}")
+                    
+        return current
+
+    @staticmethod
+    def set_value_at_path(obj: Dict, path: Union[str, List[str]], value: Any) -> None:
+        """Set value at specified path in a dict."""
+        if isinstance(path, str):
+            path_parts = path.split('.')
+        else:
+            path_parts = path
+            
+        current = obj
+        for i, part in enumerate(path_parts[:-1]):
+            # Handle array indexing
+            array_index = None
+            if '[' in part and ']' in part:
+                part, index_str = part.split('[')
+                array_index = int(index_str.rstrip(']'))
+                
+            if array_index is not None:
+                if part not in current:
+                    current[part] = []
+                while len(current[part]) <= array_index:
+                    current[part].append({})
+                current = current[part][array_index]
+            else:
+                if part not in current:
+                    current[part] = {}
+                current = current[part]
+                
+        last_part = path_parts[-1]
         array_index = None
-        if '[' in part and ']' in part:
-            part, index_str = part.split('[')
+        if '[' in last_part and ']' in last_part:
+            last_part, index_str = last_part.split('[')
             array_index = int(index_str.rstrip(']'))
             
-        field = current.DESCRIPTOR.fields_by_name.get(part)
-        if not field:
-            return False
-            
-        if i == len(path_parts) - 1:
-            try:
-                if array_index is not None:
-                    repeated_field = getattr(current, part)
-                    if array_index >= len(repeated_field):
-                        return False
-                    if field.type == FieldDescriptor.TYPE_MESSAGE:
-                        repeated_field[array_index].CopyFrom(new_value)
-                    else:
-                        repeated_field[array_index] = new_value
-                else:
-                    if field.type == FieldDescriptor.TYPE_MESSAGE:
-                        getattr(current, part).CopyFrom(new_value)
-                    else:
-                        setattr(current, part, new_value)
-                return True
-            except (TypeError, ValueError):
-                return False
-        
         if array_index is not None:
-            repeated_field = getattr(current, part)
-            if array_index >= len(repeated_field):
-                return False
-            current = repeated_field[array_index]
+            if last_part not in current:
+                current[last_part] = []
+            while len(current[last_part]) <= array_index:
+                current[last_part].append(None)
+            current[last_part][array_index] = value
         else:
-            current = getattr(current, part)
-    
-    return False
+            current[last_part] = value
 
-def main():
-    # Create a new Person message
-    person = person_pb2.Person()
+    @staticmethod
+    def update_protobuf_message(message: Message, updates: List[Dict[str, Any]]) -> Message:
+        """
+        Update a protobuf message with multiple updates.
+        
+        Args:
+            message: The protobuf message to update
+            updates: List of dictionaries with 'path' and 'value' keys
+                    Each dict should have format: {'path': 'path.to.field', 'value': new_value}
+        
+        Returns:
+            Updated protobuf message
+        """
+        # Convert protobuf message to dict
+        message_dict = MessageToDict(message)
+        
+        # Apply all updates to the dict
+        for update in updates:
+            path = update['path']
+            value = update['value']
+            try:
+                DynamicProtobufUpdater.set_value_at_path(message_dict, path, value)
+            except (KeyError, ValueError) as e:
+                print(f"Warning: Failed to apply update at path {path}: {str(e)}")
+                continue
+        
+        # Convert back to protobuf message
+        message.Clear()
+        ParseDict(message_dict, message)
+        return message
+
+def example_usage_with_any_message(message: Message, updates: List[Dict[str, Any]]):
+    """
+    Example of how to use the DynamicProtobufUpdater with any protobuf message.
     
-    # Set initial values
-    person.name = "John Doe"
-    person.address.street = "123 Old Street"
-    person.address.city = "Old City"
-    person.address.country = "Old Country"
-    
-    # Add two phone numbers
-    phone1 = person.phones.add()
-    phone1.number = "555-1111"
-    phone1.type = person_pb2.PhoneType.MOBILE
-    
-    phone2 = person.phones.add()
-    phone2.number = "555-2222"
-    phone2.type = person_pb2.PhoneType.HOME
-    
-    # Print initial state
-    print("Initial state:")
-    print(person)
+    Args:
+        message: Any protobuf message
+        updates: List of updates to apply
+    """
+    # Print original message
+    print("Original message:")
+    print(MessageToDict(message))
     print("\n" + "="*50 + "\n")
     
-    # Demonstrate different types of updates
+    # Apply updates
+    updater = DynamicProtobufUpdater()
+    try:
+        updated_message = updater.update_protobuf_message(message, updates)
+        print("Updated message:")
+        print(MessageToDict(updated_message))
+    except Exception as e:
+        print(f"Error updating message: {str(e)}")
+    
+    return updated_message
+
+# Example usage
+if __name__ == "__main__":
+    # This example works with ANY protobuf message
+    # Here's how you would use it:
+    
+    """
+    # Example with your actual protobuf message:
+    my_message = YourProtobufMessage()  # Your actual protobuf message
+    
     updates = [
-        ("name", "Jane Smith"),
-        ("address.street", "456 New Street"),
-        ("address.city", "New City"),
-        ("phones[0].number", "555-3333"),
-        (["phones", "1", "type"], person_pb2.PhoneType.WORK)
+        {"path": "field1.nested_field", "value": "new_value"},
+        {"path": "repeated_field[0].some_value", "value": 42},
+        {"path": "deep.nested.field", "value": "updated"},
     ]
     
-    for path, value in updates:
-        success = update_protobuf_value(person, path, value)
-        print(f"Update {path} -> {value}: {'Success' if success else 'Failed'}")
-        print(person)
-        print("\n" + "="*50 + "\n")
+    updated_message = example_usage_with_any_message(my_message, updates)
+    """
 
-if __name__ == "__main__":
-    main()
+
+
+# Example usage with your actual message
+from your_proto_file_pb2 import YourMessage  # Import your generated protobuf
+
+# Create or load your message
+message = YourMessage()
+# ... (populate your message)
+
+# Define updates
+updates = [
+    {
+        "path": "some.nested.field",
+        "value": "new value"
+    },
+    {
+        "path": "repeated_field[0].nested_value",
+        "value": 42
+    },
+    # Add more updates as needed
+]
+
+# Apply updates
+updater = DynamicProtobufUpdater()
+updated_message = updater.update_protobuf_message(message, updates)
