@@ -1,186 +1,25 @@
-from google.protobuf.internal import decoder, encoder, wire_format
-from google.protobuf.message import Message
-from google.protobuf import descriptor_pool
-from google.protobuf import message_factory
-from typing import Any, Dict, List, Optional, Tuple
-import struct
-import binascii
+Subject: Thank You for Your Outstanding Contribution to HUTI Testing
 
-class DirectGpbHandler:
-    def __init__(self):
-        """Initialize the GPB handler"""
-        self.pool = descriptor_pool.DescriptorPool()
-        self.message_factory = message_factory.MessageFactory(self.pool)
+Hi Akshita,
 
-    def read_raw_message(self, file_path: str) -> bytes:
-        """Read raw bytes from GPB file"""
-        with open(file_path, 'rb') as f:
-            return f.read()
+I wanted to take a moment to express my sincere appreciation for your hard work and commitment to HUTI testing. Your proactive approach, ownership, and responsiveness have made a significant difference to the team, and your dependability has been a tremendous asset. 
 
-    def parse_raw_fields(self, raw_data: bytes) -> List[Tuple[int, int, bytes]]:
-        """
-        Parse raw protobuf fields without knowing the message type.
-        Returns list of (field_number, wire_type, value) tuples.
-        """
-        pos = 0
-        length = len(raw_data)
-        fields = []
-        
-        while pos < length:
-            try:
-                tag, new_pos = decoder._DecodeVarint(raw_data, pos)
-                field_number, wire_type = wire_format.UnpackTag(tag)
-                pos = new_pos
-                
-                if wire_type == wire_format.WIRETYPE_VARINT:
-                    value, new_pos = decoder._DecodeVarint(raw_data, pos)
-                    value_bytes = raw_data[pos:new_pos]
-                elif wire_type == wire_format.WIRETYPE_FIXED64:
-                    value_bytes = raw_data[pos:pos + 8]
-                    new_pos = pos + 8
-                elif wire_type == wire_format.WIRETYPE_LENGTH_DELIMITED:
-                    size, pos = decoder._DecodeVarint(raw_data, pos)
-                    value_bytes = raw_data[pos:pos + size]
-                    new_pos = pos + size
-                elif wire_type == wire_format.WIRETYPE_FIXED32:
-                    value_bytes = raw_data[pos:pos + 4]
-                    new_pos = pos + 4
-                else:
-                    print(f"Unknown wire type: {wire_type}")
-                    break
-                
-                fields.append((field_number, wire_type, value_bytes))
-                pos = new_pos
-                
-            except Exception as e:
-                print(f"Error parsing at position {pos}: {str(e)}")
-                break
-                
-        return fields
+Thank you for consistently going above and beyond to ensure everything runs smoothly. Your dedication truly does not go unnoticed, and it’s a pleasure to work alongside someone who takes such responsibility and pride in their work.
 
-    def decode_value(self, wire_type: int, value_bytes: bytes) -> Any:
-        """Decode value based on wire type"""
-        try:
-            if wire_type == wire_format.WIRETYPE_VARINT:
-                value, _ = decoder._DecodeVarint(value_bytes, 0)
-                return value
-            elif wire_type == wire_format.WIRETYPE_FIXED64:
-                return struct.unpack('<Q', value_bytes)[0]
-            elif wire_type == wire_format.WIRETYPE_LENGTH_DELIMITED:
-                try:
-                    # Try to decode as UTF-8 string
-                    return value_bytes.decode('utf-8')
-                except UnicodeDecodeError:
-                    # If not a string, return hex representation
-                    return binascii.hexlify(value_bytes).decode('ascii')
-            elif wire_type == wire_format.WIRETYPE_FIXED32:
-                return struct.unpack('<I', value_bytes)[0]
-            else:
-                return f"Unknown wire type: {wire_type}"
-        except Exception as e:
-            return f"Error decoding: {str(e)}"
+Looking forward to many more successful collaborations!
 
-    def print_gpb_content(self, file_path: str):
-        """Print the content of a GPB file"""
-        raw_data = self.read_raw_message(file_path)
-        fields = self.parse_raw_fields(raw_data)
-        
-        print(f"\nGPB File Content ({file_path}):")
-        print("-" * 50)
-        for field_number, wire_type, value_bytes in fields:
-            decoded_value = self.decode_value(wire_type, value_bytes)
-            wire_type_name = {
-                0: "VARINT",
-                1: "FIXED64",
-                2: "LENGTH_DELIMITED",
-                5: "FIXED32"
-            }.get(wire_type, f"UNKNOWN({wire_type})")
-            
-            print(f"Field {field_number}:")
-            print(f"  Wire Type: {wire_type_name}")
-            print(f"  Value: {decoded_value}")
-            print("-" * 50)
+Best regards,  
+[Your Name]
 
-    def modify_field(self, raw_data: bytes, field_number: int, new_value: Any) -> bytes:
-        """
-        Modify a field in the raw protobuf data.
-        Returns modified protobuf data.
-        """
-        fields = self.parse_raw_fields(raw_data)
-        new_data = bytearray()
-        
-        for curr_field_number, wire_type, value_bytes in fields:
-            if curr_field_number == field_number:
-                # Encode new value based on wire type
-                if wire_type == wire_format.WIRETYPE_VARINT:
-                    tag = encoder.TagBytes(field_number, wire_type)
-                    new_data.extend(tag)
-                    new_data.extend(encoder._VarintBytes(new_value))
-                elif wire_type == wire_format.WIRETYPE_LENGTH_DELIMITED:
-                    if isinstance(new_value, str):
-                        value_bytes = new_value.encode('utf-8')
-                    else:
-                        value_bytes = new_value
-                    tag = encoder.TagBytes(field_number, wire_type)
-                    new_data.extend(tag)
-                    new_data.extend(encoder._VarintBytes(len(value_bytes)))
-                    new_data.extend(value_bytes)
-                else:
-                    # For unsupported types, keep original
-                    tag = encoder.TagBytes(field_number, wire_type)
-                    new_data.extend(tag)
-                    new_data.extend(value_bytes)
-            else:
-                # Keep original field unchanged
-                tag = encoder.TagBytes(curr_field_number, wire_type)
-                new_data.extend(tag)
-                new_data.extend(value_bytes)
-        
-        return bytes(new_data)
+Subject: Thank You for Your Support in HUTI Validation
 
-def example_usage():
-    """Example of how to use the DirectGpbHandler"""
-    # Create handler
-    handler = DirectGpbHandler()
-    
-    # Read and print GPB content
-    gpb_file = "your_file.gpb"  # Replace with your file path
-    print("\nReading original GPB file...")
-    handler.print_gpb_content(gpb_file)
-    
-    # Modify a field
-    print("\nModifying field...")
-    raw_data = handler.read_raw_message(gpb_file)
-    
-    # Example: modify field number 1 with new value
-    field_to_modify = 1
-    new_value = 42  # Replace with your new value
-    modified_data = handler.modify_field(raw_data, field_to_modify, new_value)
-    
-    # Save modified data
-    output_file = "modified.gpb"
-    with open(output_file, 'wb') as f:
-        f.write(modified_data)
-    
-    print(f"\nModified GPB saved to {output_file}")
-    print("\nReading modified GPB file...")
-    handler.print_gpb_content(output_file)
+Hi Bhavesh,
 
-if __name__ == "__main__":
-    example_usage()
+I want to extend my gratitude for your valuable support in HUTI validation. Alongside managing your regression activities, you’ve consistently stepped in to help with various other tasks, showcasing both responsiveness and proactivity.
 
+Your commitment and willingness to assist have made a real difference to the team, and I truly appreciate your dependable support. Thank you for always being willing to help and for your excellent work.
 
-# Create handler
-handler = DirectGpbHandler()
+Looking forward to continued collaboration!
 
-# Read and display your GPB file content
-gpb_file = "path/to/your/file.gpb"
-handler.print_gpb_content(gpb_file)
-
-# To modify a field:
-raw_data = handler.read_raw_message(gpb_file)
-modified_data = handler.modify_field(raw_data, field_number=1, new_value="new value")
-
-# Save modified data
-with open("modified.gpb", "wb") as f:
-    f.write(modified_data)
+Best regards,  
+[Your Name]
