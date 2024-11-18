@@ -26,9 +26,9 @@ Culture and Values:
 
 Roberto has been an exemplary team member when it comes to collaboration and maintaining a positive team culture. His willingness to assist others and his availability to help teammates is a major asset to the team. Roberto’s energy and passion for his work make him an inspiring colleague who is always ready to take on new challenges, and his involvement in different projects demonstrates his enthusiasm to learn and grow. A colleague shared, “Roberto brings a lot of positive energy to the team, and his willingness to take on new tasks has helped push our projects forward.”
 
-However, Roberto could improve in terms of sharing his work progress more regularly. Sometimes, his involvement in multiple projects at once means that updates on his tasks are less frequent, and this makes it challenging for others to track his progress. One team member remarked, “It’s hard to know where Roberto is on his tasks unless we specifically check in with him.” This can create confusion, especially when working on cross-functional initiatives, where visibility into individual contributions is crucial.
 
-To improve in this area, Roberto could make a habit of providing regular updates during team meetings or through project management tools. This would not only ensure that everyone is aligned but also give others the chance to offer feedback or help if needed.
+
+
 
 ---
 
@@ -37,6 +37,8 @@ Development Feedback:
 Roberto has shown great technical skills across different areas, including Power BI development, Testplan improvements, and AIML POCs. His ability to contribute to both frontend and backend tasks makes him a versatile asset to the team. Additionally, his engagement with various hygiene items and maintenance tasks reflects his comprehensive understanding of the technical environment. A peer mentioned, “Roberto has an impressive ability to juggle multiple tasks while maintaining quality, which is something we really appreciate in our fast-paced environment.”
 
 However, one area for improvement is the need for a more structured approach to requirement gathering and task planning. A team member mentioned, “Roberto sometimes starts tasks before fully understanding all the requirements, which leads to having to go back and make adjustments later on.” This approach can result in unnecessary rework, which could be avoided by first thoroughly discussing requirements and planning the task in detail.
+
+However, Roberto could improve by ensuring that the tasks he is working on are not overlapping with tasks assigned to others. At times, his involvement in multiple projects can lead to some confusion regarding task ownership, making it challenging for the team to track progress. One team member mentioned, “It’s important to confirm if the tasks you are working on are already assigned to someone else, and vice versa, to avoid unnecessary duplication of effort.” Clarifying task ownership early on can help streamline workflow, especially when working on cross-functional initiatives, where clear visibility into individual contributions is essential.
 
 Roberto would benefit from adopting a more methodical approach to project initiation. By ensuring that he understands the business context and requirements fully before starting development, he can reduce the need for rework and enhance his overall efficiency. Additionally, dedicating more time to discussing the implementation approach with stakeholders would allow him to address potential issues early on, ensuring smoother project execution.
 
