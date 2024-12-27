@@ -1,14 +1,14 @@
-**Subject:** Inquiry Regarding Extension of Yagna's Internship  
+**Subject:** Notification: Completion of Internship for Yagna Kusumachi on 1st January 2025  
 
-Dear [Recipient's Name],  
+Dear [HR Partner's Name],  
 
-I hope this email finds you well.  
+As per the termination checklist process, I am writing to inform you that **Yagna Kusumachi**, who has been serving as an intern in the **[Department/Team Name]**, will be completing their internship on **1st January 2025**.  
 
-Yagna has been interning with me for the past five months, and his performance has been consistently good throughout this period. His dedication and contributions have been commendable. As per the current arrangement, his last working day is towards the end of January, and I have received a mail to initiate the termination checklist.  
+Kindly initiate the necessary steps outlined in the termination checklist to ensure a smooth transition process. Please let me know if any additional details or actions are required from my end.  
 
-Based on his positive feedback and performance, I wanted to inquire if there is a possibility to extend his internship. Please let me know the process or requirements if an extension can be considered.  
-
-Looking forward to your response.  
+Thank you for your support.  
 
 Best regards,  
-[Your Name]  
+[Your Full Name]  
+[Your Job Title]  
+[Your Contact Information]  
