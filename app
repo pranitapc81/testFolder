@@ -1,26 +1,29 @@
+Here’s an updated version of the feedback explicitly emphasizing Yagna’s efforts under the guidance and help of the team:
+
+---
 
 ### Feedback for Yagna  
 
 #### **Performance and Impact**  
-- Demonstrated excellent progress in Python development for TestPlan and PowerBI dashboard creation.  
-- Delivered a solution that provides clear insights into field-level validation results, which is crucial for the client.  
-- Successfully transitioned the project from a POC to a scalable solution for all Go-Live mandates and asset classes.  
-- Proactively tested the solution before raising a PR, ensuring minimal rework and high-quality delivery.
+- Made significant progress in Python development for Test Plan and Power BI dashboard creation under the guidance of the team and senior members.  
+- Effectively utilized the team’s support to create a solution that enables clients to understand field-level validation results.  
+- Initiated the work as a POC and successfully scaled it for all Go-Live mandates and asset classes, demonstrating adaptability and problem-solving skills.  
+- Ensured high-quality deliverables by thoroughly testing the solution before raising a Pull Request (PR).  
 
 #### **Risk and Controls**  
-- Ensured proper code testing before PR submissions, reducing potential implementation risks.  
-- Maintained strong adherence to quality control, contributing to a more stable and reliable solution.  
-- Focused on building a robust and scalable solution, minimizing future operational risks.  
+- Followed best practices by conducting rigorous code testing, reducing risks of deployment issues.  
+- Leveraged feedback and mentorship to ensure a robust design that addresses validation errors effectively.  
+- Reduced operational risks by aligning the development process with client requirements and maintaining a focus on quality.  
 
 #### **Culture and Values**  
-- Displayed ownership and accountability in extending the POC to a full-scale implementation.  
-- Contributed to the team’s success by aligning with client expectations and delivering impactful solutions.  
-- Fostered a culture of excellence by adhering to high testing standards and client-centricity.  
+- Worked collaboratively with team members and senior mentors, showcasing strong teamwork and a willingness to learn.  
+- Displayed humility and an open mindset by seeking help and effectively implementing feedback to improve the deliverables.  
+- Contributed to the team’s culture by actively engaging in discussions and sharing progress transparently.  
 
 #### **Development Feedback**  
-- Continue refining the dashboard design and insights to maximize client usability and satisfaction.  
-- Explore opportunities to further optimize the Python code for enhanced performance and scalability.  
-- Ensure documentation is comprehensive, enabling easier handovers and maintenance.  
-- Consider seeking feedback from peers and stakeholders regularly to incorporate diverse perspectives into the solution.  
+- Continue building on your collaborative approach while developing deeper technical expertise in Python and Power BI.  
+- Focus on improving documentation practices to ensure your solutions are easily scalable and reusable.  
+- Seek opportunities to take ownership of more complex tasks to further develop your technical and problem-solving skills.  
+- Maintain your proactive communication and ensure alignment with evolving client and team expectations.  
 
-Yagna's proactive approach and technical expertise are commendable and significantly contribute to client success. Keep up the great work!
+Keep up the great work, Yagna! Your ability to learn and grow with the team’s guidance has significantly contributed to the project’s success.
