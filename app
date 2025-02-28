@@ -1,62 +1,17 @@
+You are given a string S consisting of lowercase English letters. You need to transform this string into a new encrypted string using the following rules:
 
-Job Description: Python Test Engineer
+Each character in the string is replaced with its frequency followed by the character itself.
+If a character appears consecutively, group them together and apply the transformation once.
+The output string should be sorted in descending order of frequency. If two characters have the same frequency, maintain their original order from S.
+Input:
+A string S (1 ≤ |S| ≤ 10^5) containing only lowercase English letters.
 
-Role Overview:
-We are seeking a highly skilled Python Test Engineer with expertise in Pytest, BDD, core Python programming, CI/CD, and building automation tools. The ideal candidate will have a strong techno-functional understanding, enabling them to bridge the gap between testing, development, and business requirements.
+Output:
+Return the transformed and sorted string.
 
-Key Responsibilities:
-
-Test Automation Development: Design, develop, and maintain automated test frameworks and test scripts using Pytest and BDD (Behavior-Driven Development) frameworks like Cucumber or Behave.
-
-Functional & Regression Testing: Execute functional, regression, and end-to-end testing to ensure software quality and stability.
-
-Programming & Scripting: Utilize Core Python to develop test cases, automation tools, and scripts to improve testing efficiency.
-
-CI/CD Integration: Implement and integrate automated tests within CI/CD pipelines (Jenkins, GitHub Actions, GitLab CI, or Azure DevOps).
-
-Techno-Functional Analysis: Collaborate with business analysts, developers, and product managers to understand requirements and design comprehensive test plans.
-
-Tool Development & Enhancement: Build and enhance internal test tools and frameworks to improve automation coverage and efficiency.
-
-Defect Management: Identify, document, and track bugs, ensuring timely resolution in collaboration with development teams.
-
-Performance & API Testing: Perform API testing using tools like Postman, RestAssured, or Python requests and contribute to performance testing initiatives.
-
-Continuous Improvement: Stay updated with the latest automation testing trends and introduce best practices into the test automation process.
+S = "aaabbcddd"
+3a3d2b1c
 
 
-Required Skills & Qualifications:
-
-Strong Python programming skills, including experience in automation frameworks.
-
-Experience with Pytest, BDD (Behave/Cucumber), and unit testing frameworks.
-
-Hands-on experience in building test automation tools and frameworks.
-
-Familiarity with CI/CD tools like Jenkins, GitLab CI, or Azure DevOps.
-
-Good understanding of software testing principles, including functional, integration, regression, and performance testing.
-
-Experience working with APIs, databases, and cloud-based environments.
-
-Strong techno-functional mindset with the ability to analyze and understand business requirements.
-
-Experience with Git, Docker, Kubernetes, and cloud platforms is a plus.
-
-
-Preferred Qualifications:
-
-Experience in Agile/Scrum methodologies.
-
-Exposure to robotic process automation (RPA) or AI-based testing tools.
-
-Knowledge of performance testing tools like JMeter or Locust.
-
-
-If you are passionate about automation, have a strong technical background, and want to contribute to a dynamic and innovative team, we encourage you to apply!
-
-
----
-
-Let me know if you need any modifications!
-
+S = "eeeffgggaa"
+3e3g3a2f
