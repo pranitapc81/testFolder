@@ -1,0 +1,99 @@
+import asyncio
+import httpx
+from ai_expo_demo import demo_response
+class APIClient:
+    def __init__(self, base_url: str , calls_per_minute: int = 20):
+        self.base_url = base_url
+        self.semaphore = asyncio.Semaphore(calls_per_minute)
+        self.client = httpx.AsyncClient(timeout=httpx.Timeout(80.0))  # Set timeout to 30 seconds
+
+    async def call(self, question: str, mode: str) -> dict:
+        try:
+            print("Initializing API call...")
+            
+            url = "http://10.241.132.217:8000/ka/aq"
+            
+            headers = {
+                "accept": "application/json",
+                "Content-Type": "application/json"
+            }
+            
+            payload = {
+                "user_question": question,
+                "answer_mode": mode,
+                "is_demo": False
+            }
+            
+            # async with self.semaphore:
+            #     response = await self.client.post(url, headers=headers, json=payload)
+            #     return response.json()
+            
+            data = demo_response("some strings ascii")
+            
+            # Extract JIRA IDs from both fields
+            jira_ids_analyzed = data.get("jira_ids_analyzed", "")
+            jira_ids = data.get("jira_ids", "")
+            
+            # Extract JIRA IDs from interpretation and implementation
+            interpretation_jira_ids = [
+                detail.get("jira_issue_id") for detail in (data.get("interpretation", {}).get("details") or [])
+                if detail.get("jira_issue_id")
+            ]
+            
+            implementation_jira_ids = [
+                detail.get("jira_issue_id") for detail in (data.get("implementation", {}).get("details") or [])
+                if detail.get("jira_issue_id")
+            ]
+            
+            # Combine all JIRA IDs
+            all_jira_ids = set()
+            if jira_ids_analyzed:
+                all_jira_ids.update(jira_ids_analyzed.split(","))
+            if jira_ids:
+                all_jira_ids.update(jira_ids.split(","))
+            if interpretation_jira_ids:
+                all_jira_ids.update(interpretation_jira_ids)
+            if implementation_jira_ids:
+                all_jira_ids.update(implementation_jira_ids)
+            
+            # Convert to comma-separated strings
+            data["Predicted Interpretation Jira"] = ",".join(interpretation_jira_ids) if interpretation_jira_ids else ""
+            data["Predicted Implementation Jira"] = ",".join(implementation_jira_ids) if implementation_jira_ids else ""
+            data["jira_ids"] = ",".join(all_jira_ids) if all_jira_ids else ""
+            
+            # Extract PR IDs
+            pr_ids = [
+                detail.get("pr_id") for detail in (data.get("implementation", {}).get("details") or [])
+                if detail.get("pr_id")
+            ]
+            data["pr_ids"] = ",".join(pr_ids) if pr_ids else ""
+            print("DATAA31---")
+            
+            
+            # data["Predicted Implementation PR"] = [
+            #     pr for detail in (data.get("implementation", {}).get("details") or [])
+            #     for pr in detail.get("pull_request_summaries", [])
+            # ]
+
+            # data["Predicted Interpretation Jira"] = [
+            #     pr for detail in (data.get("implementation", {}).get("details") or [])
+            #     for pr in detail.get("jira_issue_id", [])
+            # ]
+
+            print("DATAA4q---")
+            print(data)
+            print("DATAA411---")
+            print(data["Predicted Interpretation Jira"])
+            print("DATAA42---")
+            # print(data["interpretation_jira_ids"])
+            print("ooo")
+
+            
+            
+            return data
+            
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+            
+        finally:
+            print("API call completed.")
