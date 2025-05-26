@@ -1,0 +1,57 @@
+"""Processor for direct answer type responses."""
+from typing import Dict, Any, Optional
+import pandas as pd
+import asyncio
+
+from .base_processor import BaseProcessor
+from metrics.coverage import calculate_coverage, process_jira_ids
+
+class DirectAnswerProcessor(BaseProcessor):
+    """Processor for direct answer type responses."""
+    
+    async def process(self, response: Dict[str, Any], row: pd.Series, client) -> Dict[str, Any]:
+        """Process direct answer results."""
+        # Get the predicted JIRA IDs as a string and split into a set
+        predicted_jira_str = response.get('Predicted Interpretation Jira', '')
+        predicted_jira_set = set(
+            predicted_jira_str.split(',') if isinstance(predicted_jira_str, str)
+            else ','.join(predicted_jira_str).split(',')
+        ) if predicted_jira_str else set()
+        
+        interpretation_jira_match_accuracy = calculate_coverage(
+            predicted_jira_set,
+            process_jira_ids(row.get('Expected Interpretation Jira', ''))
+        )
+
+        # Handle jira_ids_analyzed as a comma-separated string
+        jira_analyzed_str = str(response.get('jira_ids_analyzed', '')) or ''
+        jira_analyzed_set = set(jira_analyzed_str.split(',')) if jira_analyzed_str else set()
+        
+        jira_match_accuracy = calculate_coverage(
+            jira_analyzed_set,
+            process_jira_ids(row.get('Expected Jira ID Analyzed', ''))
+        )
+
+        # Calculate similarity between predicted and expected answers
+        predicted_answer = response.get('answer', '')
+        expected_answer = row.get('Expected Answer', '')
+        answer_quality_score = 0.0
+        
+        if predicted_answer and expected_answer:
+            answer_quality_score = await client.calculate_similarity(predicted_answer, expected_answer)
+            answer_quality_score = round(answer_quality_score * 100, 2)  # Convert to percentage
+
+        direct_answer_evaluation_score = (interpretation_jira_match_accuracy + jira_match_accuracy + answer_quality_score) / 3
+
+        return {
+            "Overall Evaluation Score": direct_answer_evaluation_score,
+            "Direct Answer Status": direct_answer_evaluation_score >= 80,
+            "Expected Answer": expected_answer,
+            "Answer Quality Score": f"{answer_quality_score}%" if answer_quality_score >= 0 else "N/A",
+            "Predicted Interpretation Jira": ''.join(response.get("Predicted Interpretation Jira", [])),
+            "Expected Interpretation Jira": row.get('Expected Interpretation Jira'),
+            "Interpretation Jira Match Accuracy": interpretation_jira_match_accuracy,
+            "Jira Match Accuracy": jira_match_accuracy,
+            "Predicted Jira ID Analyzed": response.get('jira_ids_analyzed'),
+            "Expected Jira ID Analyzed": row.get('Expected Jira ID Analyzed')
+        }
