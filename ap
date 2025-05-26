@@ -1,1 +1,592 @@
 
+import streamlit as st
+import asyncio
+from api_client import APIClient
+import nest_asyncio
+from direct_answer import evaluate_direct_answer
+import altair as alt
+import pandas as pd
+import os
+from datetime import datetime
+from collections import defaultdict
+
+# Set page config first
+st.set_page_config(
+    page_title="LLM Evaluation Dashboard",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS for better styling
+st.markdown("""
+<style>
+    .stTextInput label {
+        font-weight: bold;
+        color: #333;
+    }
+    .stButton button {
+        background-color: #4CAF50;
+        color: white;
+        font-weight: bold;
+        padding: 1rem 2rem;
+        border-radius: 8px;
+    }
+    .stButton button:hover {
+        background-color: #45a049;
+    }
+    .success-message {
+        background-color: #d4edda;
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+        text-align: center;
+    }
+    .sidebar .sidebar-content {
+        padding: 1rem;
+    }
+
+    /* Table Styles */
+    .evaluation-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin-top: 1rem;
+        background: white;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+    
+    .evaluation-table th {
+        background: #f5f7fa;
+        padding: 1rem 1.5rem;
+        text-align: left;
+        color: #2d3748;
+        font-weight: 600;
+        font-size: 0.9rem;
+        border-bottom: 2px solid #e2e8f0;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }
+    
+    .evaluation-table td {
+        padding: 1rem 1.5rem;
+        text-align: left;
+        color: #4a5568;
+        font-size: 0.95rem;
+        border-bottom: 1px solid #e2e8f0;
+        transition: all 0.2s ease;
+    }
+    
+    .evaluation-table tr {
+        transition: all 0.2s ease;
+        background: white;
+    }
+    
+    .evaluation-table tr:hover {
+        background: #f7fafc;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    }
+    
+    .evaluation-table tr:hover td {
+        color: #2d3748;
+    }
+    
+    .evaluation-table td:first-child {
+        font-weight: 500;
+        color: #2d3748;
+    }
+    
+    .evaluation-table td:last-child {
+        text-align: right;
+    }
+    
+    .evaluation-table th:first-child,
+    .evaluation-table td:first-child {
+        border-left: none;
+        padding-left: 1.5rem;
+    }
+    
+    .evaluation-table th:last-child,
+    .evaluation-table td:last-child {
+        border-right: none;
+        padding-right: 1.5rem;
+    }
+    
+    .evaluation-table th {
+        background: linear-gradient(to right, #f5f7fa, #f5f7fa 50%, #f0f2f5 50%);
+    }
+    
+    .evaluation-table tr:nth-child(odd) {
+        background: linear-gradient(to right, white, white 50%, #f7fafc 50%);
+    }
+    
+    .evaluation-table tr:nth-child(even) {
+        background: linear-gradient(to right, #f7fafc, #f7fafc 50%, white 50%);
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Sidebar with better styling
+with st.sidebar:
+    st.title("LLM Evaluation Dashboard")
+    page = st.selectbox(
+        "",
+        ["Direct Answer", "Implementation Answer", "Overall Trends"],
+        help="Select the type of evaluation you want to perform"
+    )
+    
+    # Add configuration inputs to sidebar
+    BASE_URL = st.text_input(
+        "API Base URL",
+        "http://10.241.132.217:8001",
+        help="Enter the API endpoint URL",
+        key="base_url_input"
+    )
+    
+    CALLS_PER_MIN = st.slider(
+        "Calls per Minute",
+        min_value=1,
+        max_value=100,
+        value=20,
+        step=1,
+        help="Adjust the rate of API calls",
+        key="calls_per_minute_slider"
+    )
+
+def load_evaluation_data():
+    output_dir = os.path.join(os.path.dirname(__file__), 'data', 'output')
+    evaluation_files = []
+    
+    # Collect all CSV files from output directory
+    for root, dirs, files in os.walk(output_dir):
+        for file in files:
+            if file.endswith('.csv'):
+                evaluation_files.append(os.path.join(root, file))
+    
+    if not evaluation_files:
+        st.error("No evaluation files found in output directory")
+        return pd.DataFrame()
+    
+    # Read and concatenate all CSV files
+    dfs = []
+    for file in evaluation_files:
+        try:
+            df = pd.read_csv(file)
+            # Add a source column to track which file the data came from
+            df['Source'] = os.path.basename(file)
+            # Convert date column to datetime if it exists
+            if 'Date' in df.columns:
+                df['Date'] = pd.to_datetime(df['Date'])
+            dfs.append(df)
+        except Exception as e:
+            st.error(f"Error reading {file}: {str(e)}")
+    
+    if not dfs:
+        st.error("Failed to read any evaluation files")
+        return pd.DataFrame()
+    
+    # Combine all dataframes
+    combined_df = pd.concat(dfs, ignore_index=True)
+    
+    # Map your CSV columns to the expected format
+    column_mapping = {
+        'Date': 'Date',
+        'Type': 'Type',
+        'Score': 'Score',
+        'Status': 'Status',
+        'Accuracy': 'Accuracy',
+        'Response_Time': 'Response_Time',
+        'Category': 'Category',
+        'Error_Type': 'Error_Type'
+    }
+    
+    # Rename columns to match expected format
+    combined_df = combined_df.rename(columns=column_mapping)
+    
+    # Add any missing columns with default values
+    required_columns = set(column_mapping.values())
+    missing_columns = required_columns - set(combined_df.columns)
+    for col in missing_columns:
+        combined_df[col] = None
+    
+    # Fill NaN values with appropriate defaults
+    combined_df = combined_df.fillna({
+        'Status': 'Unknown',
+        'Score': 0,
+        'Accuracy': 0,
+        'Response_Time': 0,
+        'Error_Type': ''
+    })
+    
+    # Sort by date if available
+    if 'Date' in combined_df.columns:
+        combined_df = combined_df.sort_values('Date', ascending=False)
+    
+    return combined_df
+
+def calculate_metrics(df):
+    """Calculate various metrics from the evaluation data."""
+    metrics = {}
+    
+    # Total evaluations
+    metrics['total_evaluations'] = len(df)
+    
+    # Success rate - using Direct Answer Status column
+    if 'Direct Answer Status' in df.columns:
+        metrics['success_rate'] = (df['Direct Answer Status'] == 'Success').mean() * 100
+    else:
+        metrics['success_rate'] = 0
+    
+    # Average response time - using Response_Time column if available
+    if 'Response_Time' in df.columns:
+        metrics['avg_response_time'] = df['Response_Time'].mean()
+    else:
+        metrics['avg_response_time'] = 0
+    
+    # Accuracy score - using Direct Answer Score column
+    if 'Direct Answer Score' in df.columns:
+        metrics['accuracy_score'] = df['Direct Answer Score'].mean() * 100
+    else:
+        metrics['accuracy_score'] = 0
+    
+    # Calculate latency - using Response_Time column
+    if 'Response_Time' in df.columns:
+        metrics['latency'] = df['Response_Time'].mean()
+    else:
+        metrics['latency'] = 0
+    
+    # Convert Date column to datetime if available
+    if 'Date' in df.columns:
+        df['Date'] = pd.to_datetime(df['Date'])
+        
+        # Calculate throughput
+        if len(df) > 1:  # Need at least 2 dates to calculate throughput
+            metrics['throughput'] = len(df) / (df['Date'].max() - df['Date'].min()).total_seconds() * 60
+        else:
+            metrics['throughput'] = 0
+    else:
+        metrics['throughput'] = 0
+    
+    return metrics
+
+def get_category_success_rates(df):
+    return df.groupby('Category')['Accuracy'].mean() * 100
+
+def get_error_distribution(df):
+    error_counts = df['Error_Type'].value_counts()
+    return error_counts
+
+def get_accuracy_over_time(df):
+    try:
+        # Make a copy to avoid SettingWithCopyWarning
+        df = df.copy()
+        # Convert Date column to datetime, handling potential errors
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        # Drop rows with NaT (invalid dates)
+        df = df.dropna(subset=['Date'])
+        if df.empty:
+            return pd.Series(dtype=float)  # Return empty Series if no valid dates
+        # Resample by month and calculate mean accuracy
+        monthly_accuracy = df.resample('M', on='Date')['Accuracy'].mean()
+        return monthly_accuracy
+    except Exception as e:
+        st.error(f"Error processing accuracy over time: {str(e)}")
+        return pd.Series(dtype=float)  # Return empty Series on error
+
+def get_response_time_distribution(df):
+    try:
+        if 'Response_Time' not in df.columns:
+            st.warning("Response_Time column not found in the data.")
+            return []
+        response_times = df['Response_Time'].dropna().tolist()
+        return response_times
+    except Exception as e:
+        st.error(f"Error processing response times: {str(e)}")
+        return []
+
+# Configuration constants
+CHART_CONFIG = {
+    'section_styles': {
+        'background': '#f8f9fa',
+        'padding': '1.5rem',
+        'border_radius': '12px',
+        'margin': '1.5rem 0',
+        'box_shadow': '0 2px 4px rgba(0,0,0,0.1)',
+        'header_style': 'margin: 0; color: #2c3e50; font-weight: 600;'
+    },
+    'metrics': {
+        'total_evaluations': 'Total Evaluations',
+        'success_rate': 'Success Rate',
+        'avg_response_time': 'Average Response Time',
+        'accuracy_score': 'Accuracy Score',
+        'latency': 'Latency',
+        'throughput': 'Throughput'
+    },
+    'coverage_metrics': {
+        'jira': 'Jira Match Accuracy',
+        'interpretation': 'Interpretation Coverage',
+        'implementation': 'Implementation Coverage'
+    },
+    'chart_titles': {
+        'accuracy_trends': '📈 Accuracy Trends Over Time',
+        'response_time': '⏱️ Response Time Distribution',
+        'category_success': '🎯 Category Success Rates',
+        'error_distribution': '⚠️ Error Distribution'
+    },
+    'chart_descriptions': {
+        'accuracy_trends': 'Monthly accuracy scores showing model performance progression',
+        'response_time': 'Distribution of API response times across evaluations',
+        'category_success': 'Accuracy scores across different evaluation categories',
+        'error_distribution': 'Frequency of different error types encountered'
+    }
+}
+
+def create_section_header(title):
+    """Create a styled section header."""
+    styles = CHART_CONFIG['section_styles']
+    return f"""
+    <div style='background: {styles['background']}; 
+                padding: {styles['padding']}; 
+                border-radius: {styles['border_radius']}; 
+                margin: {styles['margin']}; 
+                box-shadow: {styles['box_shadow']};'>
+        <h3 style='{styles['header_style']}'>{title}</h3>
+    </div>
+    """
+
+def create_chart_container(title, description, chart_data, chart_type='line'):
+    """Create a container for a chart with title and description."""
+    container = f"""
+    <div style='margin-top: 1rem;'>
+        <h4>{title}</h4>
+        <p>{description}</p>
+    </div>
+    """
+    st.markdown(container, unsafe_allow_html=True)
+    
+    if not chart_data.empty:
+        if chart_type == 'line':
+            st.line_chart(chart_data)
+        else:
+            st.bar_chart(chart_data)
+    else:
+        st.warning("No data available for this chart.")
+
+def overall_trends_page():
+    st.title("📊 Overall Trends")
+    
+    # Load evaluation data
+    df = load_evaluation_data()
+    
+    if df.empty:
+        st.warning("No evaluation data available. Please run evaluations first.")
+        return
+    
+    # Calculate metrics
+    metrics = calculate_metrics(df)
+    
+    # Display metrics section
+    st.markdown(create_section_header("📊 Key Performance Metrics"), unsafe_allow_html=True)
+    
+    # Create a 3x2 grid for metrics
+    col1, col2, col3 = st.columns(3)
+    col4, col5, col6 = st.columns(3)
+    
+    # Display metrics using configuration
+    metric_config = CHART_CONFIG['metrics']
+    with col1:
+        st.metric(label=metric_config['total_evaluations'], value=f"{metrics['total_evaluations']:,}")
+    with col2:
+        st.metric(label=metric_config['success_rate'], value=f"{metrics['success_rate']:.1f}%")
+    with col3:
+        st.metric(label=metric_config['avg_response_time'], value=f"{metrics['avg_response_time']:.1f}s")
+    with col4:
+        st.metric(label=metric_config['accuracy_score'], value=f"{metrics['accuracy_score']:.1f}%")
+    with col5:
+        st.metric(label=metric_config['latency'], value=f"{metrics['latency']:.1f}ms")
+    with col6:
+        st.metric(label=metric_config['throughput'], value=f"{metrics['throughput']:.1f} req/min")
+    
+    # Display coverage metrics
+    st.markdown(create_section_header("📊 Coverage Metrics"), unsafe_allow_html=True)
+    
+    # Create coverage charts if the columns exist
+    coverage_cols = [
+        ('Jira Match Accuracy', CHART_CONFIG['coverage_metrics']['jira']),
+        ('Interpretation Jira Match Accuracy', CHART_CONFIG['coverage_metrics']['interpretation']),
+        ('Implementation Jira Match Accuracy', CHART_CONFIG['coverage_metrics']['implementation'])
+    ]
+    
+    if any(col[0] in df.columns for col in coverage_cols):
+        cols = st.columns(3)
+        for idx, (col_name, display_name) in enumerate(coverage_cols):
+            with cols[idx]:
+                if col_name in df.columns and not df[col_name].isna().all():
+                    coverage = df[col_name].mean()
+                    st.metric(label=display_name, value=f"{coverage:.1f}%")
+                else:
+                    st.metric(label=display_name, value="N/A")
+    else:
+        st.warning("Coverage metrics not available in the data.")
+    
+    # Add charts section
+    st.markdown(create_section_header("📈 Performance Analytics"), unsafe_allow_html=True)
+    
+    # Create a 2x2 grid for charts
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Accuracy Trends Over Time
+        accuracy_over_time = get_accuracy_over_time(df)
+        create_chart_container(
+            title=CHART_CONFIG['chart_titles']['accuracy_trends'],
+            description=CHART_CONFIG['chart_descriptions']['accuracy_trends'],
+            chart_data=accuracy_over_time,
+            chart_type='line'
+        )
+        
+        # Response Time Distribution
+        response_times = get_response_time_distribution(df)
+        create_chart_container(
+            title=CHART_CONFIG['chart_titles']['response_time'],
+            description=CHART_CONFIG['chart_descriptions']['response_time'],
+            chart_data=response_times,
+            chart_type='bar'
+        )
+    
+    with col2:
+        # Category Success Rates
+        category_success_rates = get_category_success_rates(df)
+        create_chart_container(
+            title=CHART_CONFIG['chart_titles']['category_success'],
+            description=CHART_CONFIG['chart_descriptions']['category_success'],
+            chart_data=category_success_rates,
+            chart_type='bar'
+        )
+        
+        # Error Distribution
+        error_distribution = get_error_distribution(df)
+        create_chart_container(
+            title=CHART_CONFIG['chart_titles']['error_distribution'],
+            description=CHART_CONFIG['chart_descriptions']['error_distribution'],
+            chart_data=error_distribution,
+            chart_type='bar'
+        )
+    
+    # Add recent evaluations section
+    st.markdown(create_section_header("📋 Recent Evaluations"), unsafe_allow_html=True)
+    
+    # Create a table of recent evaluations
+    recent_evaluations = df.sort_values('Date', ascending=False).head(5)
+    
+    # Display the table with improved styling
+    st.dataframe(
+        recent_evaluations, 
+        use_container_width=True,
+        column_config={
+            'Date': st.column_config.DatetimeColumn(
+                'Date',
+                format='YYYY-MM-DD HH:mm',
+                help='Date and time of evaluation'
+            )
+        }
+    )
+
+   
+    
+    
+
+async def direct_answer_page():
+    st.title("🚀 Direct Answer Evaluation")
+    
+    # Add the "How it works" section at the top
+    st.markdown("""
+    <div style='background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; border-left: 4px solid #4f8bf9;'>
+        <h4 style='margin-top: 0;'>📖 How it works</h4>
+        <ol style='margin-bottom: 0;'>
+            <li>Enter your API endpoint URL in the sidebar</li>
+            <li>Adjust the call rate if needed</li>
+            <li>Click the "Run Evaluation" button below</li>
+        </ol>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Add custom CSS to style the button
+    st.markdown("""
+    <style>
+        div[data-testid="stButton"] > button[kind="primary"] {
+            max-width: 200px;
+            margin: 0;
+            display: block;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Create a container for the evaluation button
+    with st.container():
+        if st.button("Run Evaluation", type="primary", key="run_evaluation_button", use_container_width=True):
+            client = APIClient(BASE_URL, calls_per_minute=CALLS_PER_MIN)
+            
+            # Show spinner while evaluation is running
+            with st.spinner('🚀 Running evaluation. This may take a few moments...'):
+                await evaluate_direct_answer(client)
+            
+            st.markdown("""
+            <div class="success-message">
+                <h3>✅ Evaluation Completed!</h3>
+                <p>Your evaluation has been successfully completed.</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+async def implementation_answer_page():
+    st.title("🔧 Implementation Answer Evaluation")
+    
+    # Add the "How it works" section at the top
+    st.markdown("""
+    <div style='background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; border-left: 4px solid #4f8bf9;'>
+        <h4 style='margin-top: 0;'>📖 How it works</h4>
+        <ol style='margin-bottom: 0;'>
+            <li>Enter your API endpoint URL in the sidebar</li>
+            <li>Adjust the call rate if needed</li>
+            <li>Click the "Run Evaluation" button below</li>
+        </ol>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Add custom CSS to style the button
+    st.markdown("""
+    <style>
+        div[data-testid="stButton"] > button[kind="primary"] {
+            max-width: 200px;
+            margin: 0;
+            display: block;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Create a container for the evaluation button
+    with st.container():
+        if st.button("Run Evaluation", type="primary", key="run_implementation_evaluation_button", use_container_width=True):
+            client = APIClient(BASE_URL, calls_per_minute=CALLS_PER_MIN)
+            
+            # Show spinner while evaluation is running
+            with st.spinner('🚀 Running implementation evaluation. This may take a few moments...'):
+                await evaluate_implementation_answer(client)
+            
+            st.markdown("""
+            <div class="success-message">
+                <h3>✅ Implementation Evaluation Completed!</h3>
+                <p>Your implementation evaluation has been successfully completed.</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+# Main Execution
+if page == "Overall Trends":
+    overall_trends_page()
+elif page == "Direct Answer":
+    asyncio.run(direct_answer_page())
+elif page == "Implementation Answer":
+    asyncio.run(implementation_answer_page())
