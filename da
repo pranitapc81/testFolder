@@ -1,1 +1,1331 @@
+from regression import run_regression
+import nest_asyncio
+import pandas as pd
+import streamlit as st
+import plotly.express as px
+import numpy as np
+import re
+nest_asyncio.apply()
 
+PASS_ICON = "✔"
+FAIL_ICON = "✘"
+INPUT_CSV = "data/input/input.csv"
+OUTPUT_DIR = "data/output/"
+
+def calculate_average_coverage(df, metrics):
+    """Calculate the average coverage for given metrics."""
+    return {metric: f"{df[metric].mean():.2f}%" for metric in metrics}
+
+
+def style_column(df, column, pass_icon, fail_icon):
+    """Style a column with pass/fail icons."""
+    df[column] = df[column].apply(lambda x: pass_icon if x else fail_icon)
+
+
+def color_score(val):
+    """Apply color styling for score values."""
+    if pd.isna(val):
+        return ''
+    try:
+        num = float(str(val).replace('%', '').strip()) if isinstance(val, str) else float(val)
+        if num < 70:
+            return 'background-color: #ff4b4b'
+        elif num < 80:
+            return 'background-color: #ffb60'
+        elif num < 90:
+            return 'background-color: #fff60'
+        else:
+            return 'background-color: #90ee90'
+    except (ValueError, TypeError):
+        return ''
+
+
+def color_pass(val):
+    """Apply color styling for pass/fail status."""
+    if val == PASS_ICON:
+        return (
+            'color: white;'
+            'background-color: #4CAF50;'  # Green background for pass
+            'font-weight: bold;'
+            'padding: 4px 8px;'
+            'border-radius: 4px;'
+            'text-align: center;'
+        )
+    else:
+        return (
+            'color: white;'
+            'background-color: #f44336;'  # Red background for fail
+            'font-weight: bold;'
+            'padding: 4px 8px;'
+            'border-radius: 4px;'
+            'text-align: center;'
+        )
+
+
+def display_summary_table(df, metrics):
+    """Display a summary table for average metrics with color coding."""
+    # Calculate average values
+    avg_values = [df[metric].mean() for metric in metrics]
+    
+    # Create a styled DataFrame
+    summary_data = pd.DataFrame({
+        "Metric": metrics,
+        "Value": [f"{val:.2f}%" for val in avg_values]
+    })
+    
+    st.subheader("📊 Summary Metrics")
+    
+    # Define a function to apply color based on value with light colors
+    def color_metric(val):
+        try:
+            num = float(str(val).strip('%'))
+            if num >= 80:
+                return 'background-color: #C8E6C9; color: #2E7D32; font-weight: 500; padding: 8px; border-radius: 4px; border-left: 4px solid #4CAF50;'
+            elif num >= 60:
+                return 'background-color: #FFF9C4; color: #F57F17; font-weight: 500; padding: 8px; border-radius: 4px; border-left: 4px solid #FFC107;'
+            else:
+                return 'background-color: #FFCDD2; color: #C62828; font-weight: 500; padding: 8px; border-radius: 4px; border-left: 4px solid #F44336;'
+        except (ValueError, TypeError):
+            return ''
+    
+    # Apply styling to the Value column
+    styled_df = summary_data.style.applymap(
+        color_metric,
+        subset=['Value']
+    )
+    
+    # Display the styled table
+    st.dataframe(
+        styled_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Metric": st.column_config.TextColumn(
+                "Metric",
+                help="Evaluation metric name"
+            ),
+            "Value": st.column_config.TextColumn(
+                "Score",
+                help="Average score in percentage"
+            )
+        }
+    )
+
+
+def highlight_low_scores(df, columns=None):
+    """Highlight cells with values below 80%."""
+    if columns is None:
+        columns = df.select_dtypes(include=['number']).columns
+    
+    def _highlight(val):
+        if pd.isna(val):
+            return ''
+        try:
+            # Handle both numeric values and strings with %
+            num = float(str(val).replace('%', '').strip()) if isinstance(val, str) else float(val)
+            return 'background-color: #ffcccc' if num < 80 else 'background-color: #e6ffe6'
+        except (ValueError, TypeError):
+            return ''
+    
+    return df.style.applymap(_highlight, subset=columns)
+
+def display_scenario_summary(df, score_column, status_column):
+    """Display a summary visualization for all scenarios."""
+    st.subheader("📊 Scenario Evaluation Overview")
+    
+    # Calculate metrics for each scenario
+    scenario_metrics = []
+    for scenario, group in df.groupby('Scenario'):
+        scores = pd.to_numeric(group[score_column], errors='coerce')
+        
+        # Debug: Print status values for this scenario
+        print(f"\n=== Scenario: {scenario} ===")
+        print("Status column values:")
+        print(group[status_column].value_counts(dropna=False))
+        print(f"PASS_ICON: {repr(PASS_ICON)}")
+        
+        # Convert status to string and clean it up
+        status_values = group[status_column].astype(str).str.strip()
+        
+        # Debug: Print unique status values with their Unicode code points
+        print("\nUnique status values with Unicode code points:")
+        unique_values = status_values.unique()
+        for val in unique_values:
+            # Show each character's Unicode code point
+            code_points = ' '.join([f'U+{ord(c):04X}' for c in val])
+            print(f"'{val}' - {code_points}")
+
+        # Show the first few status values in the Streamlit app
+        
+        # Define patterns for pass and fail indicators
+        pass_patterns = [
+            r'[✓✔✅]',  # Checkmark symbols
+            r'pass',
+            r'success',
+            r'correct',
+            r'1',       # Sometimes 1 is used for pass
+            r'true',
+            r'yes',
+            r'passed',
+            r'successful'
+        ]
+        
+        fail_patterns = [
+            r'[✗✘❌]',  # X symbols
+            r'fail',
+            r'error',
+            r'incorrect',
+            r'0',       # Sometimes 0 is used for fail
+            r'false',
+            r'no',
+            r'failed',
+            r'unsuccessful'
+        ]
+        
+        # Convert to lowercase for case-insensitive matching
+        lower_status = status_values.str.lower()
+        
+        # Check for pass indicators
+        is_pass = pd.Series(False, index=status_values.index)
+        for pattern in pass_patterns:
+            is_pass = is_pass | lower_status.str.contains(pattern, na=False)
+        
+        # Check for fail indicators (overrides pass if both exist)
+        is_fail = pd.Series(False, index=status_values.index)
+        for pattern in fail_patterns:
+            is_fail = is_fail | lower_status.str.contains(pattern, na=False)
+        
+        # If we found fail indicators, mark those as not pass
+        is_pass[is_fail] = False
+        
+        # If status is empty or we couldn't determine, default to fail (False)
+        is_pass[status_values.str.strip() == ''] = False
+        
+        
+        
+
+        # Debug info
+        print(f"Pass count: {is_pass.sum()}/{len(group)}")
+        print(f"Is pass values: {is_pass.tolist()}")
+        
+        scenario_metrics.append({
+            'Scenario': scenario,
+            'Average Score': scores.mean(),
+            'Pass Rate': (is_pass.mean() * 100) if len(group) >= 0 else 120,
+            'Count': len(group)
+        })
+    
+    if not scenario_metrics:
+        st.warning("No scenario data available for visualization")
+        return
+    
+    metrics_df = pd.DataFrame(scenario_metrics)
+    
+    # Create tabs for different visualizations
+    tab1, tab2, tab3 = st.tabs(["📈 Scores Overview", "📊 Pass Rate", "📋 Detailed Metrics"])
+    
+    with tab1:
+        # Create a bar chart for average scores by scenario
+        fig1 = px.bar(
+            metrics_df.sort_values('Average Score', ascending=False),
+            x='Scenario',
+            y='Average Score',
+            title='Average Score by Scenario',
+            text_auto='.1f',
+            color='Average Score',
+            color_continuous_scale='RdYlGn',
+            range_color=[0, 100]
+        )
+        fig1.update_traces(texttemplate='%{y:.1f}%', textposition='outside')
+        fig1.update_layout(
+            yaxis_title='Average Score (%)',
+            xaxis_title='',
+            coloraxis_showscale=False,
+            yaxis_range=[0, 100]
+        )
+        st.plotly_chart(fig1, use_container_width=True)
+    
+    with tab2:
+        # Create a bar chart for pass rates by scenario
+        fig2 = px.bar(
+            metrics_df.sort_values('Pass Rate', ascending=False),
+            x='Scenario',
+            y='Pass Rate',
+            title='Pass Rate by Scenario',
+            text_auto='.1f',
+            color='Pass Rate',
+            color_continuous_scale='RdYlGn',
+            range_color=[0, 100]
+        )
+        fig2.update_traces(texttemplate='%{y:.1f}%', textposition='outside')
+        fig2.update_layout(
+            yaxis_title='Pass Rate (%)',
+            xaxis_title='',
+            coloraxis_showscale=False,
+            yaxis_range=[0, 105]
+        )
+        st.plotly_chart(fig2, use_container_width=True)
+    
+    with tab3:
+        # Display detailed metrics in a table with color coding
+        metrics_df['Scenario'] = metrics_df['Scenario'].astype(str)
+        
+        def color_scenario_metrics(val, column):
+            if pd.isna(val):
+                return ''
+            try:
+                num = float(str(val).strip('%')) if '%' in str(val) else float(val)
+                if column == 'Avg Score (%)':
+                    if num >= 80:
+                        return 'background-color: #C8E6C9; color: #2E7D32; font-weight: 500; padding: 8px; border-radius: 4px; border-left: 4px solid #4CAF50;'
+                    elif num >= 60:
+                        return 'background-color: #FFF9C4; color: #F57F17; font-weight: 500; padding: 8px; border-radius: 4px; border-left: 4px solid #FFC107;'
+                    else:
+                        return 'background-color: #FFCDD2; color: #C62828; font-weight: 500; padding: 8px; border-radius: 4px; border-left: 4px solid #F44336;'
+                elif column == 'Pass Rate (%)':
+                    if num >= 80:
+                        return 'background-color: #E8F5E9; color: #2E7D32; font-weight: 500; padding: 8px; border-radius: 4px;'
+                    elif num >= 60:
+                        return 'background-color: #FFFDE7; color: #F57F17; font-weight: 500; padding: 8px; border-radius: 4px;'
+                    else:
+                        return 'background-color: #FFEBEE; color: #C62828; font-weight: 500; padding: 8px; border-radius: 4px;'
+                return ''
+            except (ValueError, TypeError):
+                return ''
+        
+        # Apply styling to the metrics table
+        styled_metrics = metrics_df.rename(columns={
+            'Average Score': 'Avg Score (%)',
+            'Pass Rate': 'Pass Rate (%)',
+            'Count': 'Test Cases'
+        })
+        
+        # Format the numbers
+        styled_metrics['Avg Score (%)'] = styled_metrics['Avg Score (%)'].apply(lambda x: f"{x:.1f}%")
+        styled_metrics['Pass Rate (%)'] = styled_metrics['Pass Rate (%)'].apply(lambda x: f"{x:.1f}%")
+        
+        # Create a styled DataFrame
+        styled_df = styled_metrics.style.apply(
+            lambda x: [color_scenario_metrics(x[i], x.name) for i in range(len(x))], 
+            subset=['Avg Score (%)', 'Pass Rate (%)'],
+            axis=1
+        )
+        
+        # Display the styled table
+        st.dataframe(
+            styled_df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Scenario": st.column_config.TextColumn("Scenario", help="Name of the test scenario"),
+                "Avg Score (%)": st.column_config.TextColumn("Avg Score", help="Average evaluation score for this scenario"),
+                "Pass Rate (%)": st.column_config.TextColumn("Pass Rate", help="Percentage of tests that passed in this scenario"),
+                "Test Cases": st.column_config.NumberColumn("Test Cases", help="Number of test cases in this scenario")
+            }
+        )
+
+def display_collapsible_tables(df, group_column, score_column, status_column):
+    """Display collapsible tables grouped by a specific column with enhanced styling."""
+    # First show the scenario summary
+    if 'Scenario' in df.columns:
+        display_scenario_summary(df, score_column, status_column)
+        st.markdown("---")  # Add a separator
+    # Make a copy of the dataframe to avoid modifying the original
+    df_display = df.copy()
+    
+    # Define columns to apply styling
+    style_columns = [
+        'Overall Evaluation Score', 
+        'Jira Match Accuracy', 
+        'Interpretation Jira Match Accuracy',
+        'PR Coverage',
+        'Answer Quality Score'
+    ]
+    
+    # Filter out columns that don't exist in the DataFrame
+    style_columns = [col for col in style_columns if col in df_display.columns]
+    
+    # Create a styled DataFrame with proper HTML formatting for the status column
+    def format_status(x):
+        # Debug log the input value and its type
+        print(f"DEBUG - format_status received: {x} (type: {type(x)})")
+        
+        # Convert to float if it's a string with a number
+        if isinstance(x, str) and x.replace('.', '', 1).isdigit():
+            x = float(x)
+        
+        # Handle different input types
+        if (x is True or 
+            x == PASS_ICON or 
+            (isinstance(x, (int, float)) and float(x) >= 80) or
+            (isinstance(x, str) and x.startswith('100'))):
+            print(f"DEBUG - Condition passed: x={x}, type={type(x)}")
+            return '✅'  # Using emoji for better compatibility
+        else:
+            print(f"DEBUG - Condition failed: x={x}, type={type(x)}")
+            return '❌'  # Using emoji for better compatibility
+    
+    # Calculate status for each row based on the score
+    df_display[status_column] = pd.to_numeric(df_display[score_column], errors='coerce').apply(
+        lambda x: PASS_ICON if x >= 80 else FAIL_ICON
+    )
+    
+    # Group and display the data
+    grouped = df_display.groupby(group_column)
+    for group_name, group in grouped:
+        # Calculate average score for this group
+        avg_score = df_display[df_display[group_column] == group_name][score_column].mean()
+        
+        # Determine border color based on evaluation score
+        if pd.notna(avg_score):
+            if avg_score >= 80:
+                border_color = "#4CAF50"  # Green
+            elif avg_score >= 60:
+                border_color = "#FFC107"  # Amber
+            else:
+                border_color = "#F44336"  # Red
+        else:
+            border_color = "#E0E0E0"  # Default gray for N/A scores
+        
+        # Create the expander with the text directly in the label
+        expander_text = f"{group_column}: {group_name} ({score_column}: {avg_score:.2f})"
+        
+        # Create the expander with the text in the label
+        expander = st.expander(expander_text, expanded=False)
+        
+        # Add custom CSS to style the expander header
+        st.markdown(f"""
+        <style>
+            div[data-testid="stExpander"][aria-expanded="false"] > div:first-child > div:first-child > div > div > div > div > div > div > div > div > div > div > div > div > div > div[data-testid="stMarkdownContainer"] p {{
+                color: {border_color} !important;
+                border-left: 4px solid {border_color} !important;
+                padding: 4px 0 4px 12px !important;
+                margin: 0 0 0 -16px !important;
+                font-weight: 500 !important;
+            }}
+        </style>
+        """, unsafe_allow_html=True)
+        
+        with expander:
+            # Create a container with fixed height and scroll
+            container = st.container()
+            
+            # Reset index and get the base columns
+            group = group.reset_index(drop=True)
+            
+            # Create a mapping of old column names to new display names
+            column_rename = {
+                status_column: 'Direct Answer Status',
+                score_column: 'Overall Evaluation Score'
+            }
+            
+            # Rename the columns
+            group = group.rename(columns=column_rename)
+            
+            # Define the exact column order as specified
+            exact_order = [
+                'Run',
+                'Scenario',
+                'Direct Answer Status',
+                'Overall Evaluation Score',
+                'Question',
+                'Expected Answer',
+                'Predicted Answer',
+                'Answer Quality Score',
+                'Expected Jira ID Analyzed',
+                'Predicted Jira ID Analyzed',
+                'Jira Match Accuracy',
+                'Expected Interpretation Jira',
+                'Predicted Interpretation Jira',
+                'Interpretation Jira Match Accuracy'
+            ]
+            
+            # Filter to only include columns that exist in the DataFrame
+            new_columns = [col for col in exact_order if col in group.columns]
+            
+            # Add any remaining columns that weren't in the exact order list
+            remaining_columns = [col for col in group.columns if col not in exact_order and col != group_column]
+            new_columns.extend(remaining_columns)
+            
+            # Reorder the columns
+            group = group[new_columns]
+            
+            # Update style_columns to use the new column name if it was renamed
+            updated_style_columns = []
+            for col in style_columns:
+                if col == score_column:
+                    updated_style_columns.append('Overall Evaluation Score')
+                else:
+                    updated_style_columns.append(col)
+            
+            # Apply numeric styling to the group with updated column names
+            styled_group = group.copy()
+            
+            # Define color function for the Overall Evaluation Score column
+            def color_score(val):
+                if pd.isna(val):
+                    return ''
+                try:
+                    num = float(str(val).strip('%')) if '%' in str(val) else float(val)
+                    if num >= 80:
+                        return 'background-color: #E8F5E9; color: #2E7D32; font-weight: 500; padding: 8px; border-radius: 4px;'  # Light Green background
+                    elif num >= 60:
+                        return 'background-color: #FFF8E1; color: #F57F17; font-weight: 500; padding: 8px; border-radius: 4px;'  # Light Amber background
+                    else:
+                        return 'background-color: #FFEBEE; color: #C62828; font-weight: 500; padding: 8px; border-radius: 4px;'  # Light Red background
+                except (ValueError, TypeError):
+                    return ''
+            
+            # Apply color to the Overall Evaluation Score column
+            if 'Overall Evaluation Score' in styled_group.columns:
+                styled_group = styled_group.style.apply(
+                    lambda x: [color_score(x['Overall Evaluation Score']) if x.name == 'Overall Evaluation Score' else '' for _ in x],
+                    axis=0
+                )
+            
+            # Apply highlight_low_scores for other columns
+            styled_group = highlight_low_scores(styled_group.data if hasattr(styled_group, 'data') else styled_group, 
+                                             columns=[col for col in updated_style_columns if col != 'Overall Evaluation Score'])
+            
+            # Display the styled DataFrame with scroll
+            with container:
+                # Create tabs for table and visualization
+                tab1, tab2 = st.tabs(["📊 Data Table", "📈 Score Distribution"])
+                
+                with tab1:
+                    # Define a function to apply color coding to metrics
+                    def color_metrics(val, column):
+                        if pd.isna(val):
+                            return ''
+                        try:
+                            num = float(str(val).strip('%')) if '%' in str(val) else float(val)
+                            if num >= 80:
+                                return 'background-color: #C8E6C9; color: #2E7D32; font-weight: 500; padding: 8px; border-radius: 4px; border-left: 4px solid #4CAF50;'
+                            elif num >= 60:
+                                return 'background-color: #FFF9C4; color: #F57F17; font-weight: 500; padding: 8px; border-radius: 4px; border-left: 4px solid #FFC107;'
+                            else:
+                                return 'background-color: #FFCDD2; color: #C62828; font-weight: 500; padding: 8px; border-radius: 4px; border-left: 4px solid #F44336;'
+                        except (ValueError, TypeError):
+                            return ''
+                    
+                    # Create a styled copy of the group without the group_column
+                    columns_to_display = [col for col in group.columns if col != group_column]
+                    
+                    # Reorder columns to put 'Run' and status column first if they exist
+                    ordered_columns = []
+                    priority_columns = ['Run', status_column]
+                    
+                    # Add priority columns first if they exist
+                    for col in priority_columns:
+                        if col in columns_to_display:
+                            ordered_columns.append(col)
+                    
+                    # Add remaining columns (excluding already added priority columns)
+                    for col in columns_to_display:
+                        if col not in priority_columns:
+                            ordered_columns.append(col)
+                    
+                    # Create the styled group with reordered columns
+                    styled_group = group[ordered_columns].copy()
+                    
+                    # Apply formatting to percentage columns
+                    for col in style_columns:
+                        if col in styled_group.columns:
+                            styled_group[col] = styled_group[col].apply(lambda x: f"{float(x):.1f}%" if pd.notna(x) and str(x).replace('.', '').isdigit() else x)
+                    
+                    # Apply styling to the status column
+                    if status_column in styled_group.columns:
+                        styled_group[status_column] = styled_group[status_column].apply(
+                            lambda x: '✅' if x == PASS_ICON else '❌'
+                        )
+                    
+                    # Get the columns to apply styling (excluding the group_column and priority columns)
+                    style_columns_filtered = [col for col in style_columns if col in styled_group.columns]
+                    
+                    # Create a styled DataFrame
+                    styled_df = styled_group.style
+                    
+                    # Apply color to the Overall Evaluation Score column
+                    if 'Overall Evaluation Score' in styled_group.columns:
+                        def style_eval_score(col):
+                            if col.name == 'Overall Evaluation Score':
+                                return col.apply(color_score)
+                            return [''] * len(col)
+                        
+                        styled_df = styled_df.apply(style_eval_score, axis=0)
+                    
+                    # Apply other column styling
+                    if style_columns_filtered:
+                        styled_df = styled_df.apply(
+                            lambda x: [color_metrics(x[i], x.name) for i in range(len(x))],
+                            subset=style_columns_filtered,
+                            axis=1
+                        )
+                    
+                    # Display the styled table
+                    st.dataframe(
+                        styled_df,
+                        use_container_width=True,
+                        height=min(400, (len(group) + 1) * 45 + 3),
+                        column_config={
+                            status_column: st.column_config.TextColumn(
+                                status_column,
+                                help="Status of the evaluation"
+                            ) if status_column in styled_group.columns else None,
+                            **{
+                                col: st.column_config.TextColumn(
+                                    col,
+                                    help=f"{col} score"
+                                ) for col in style_columns_filtered
+                            }
+                        }
+                    )
+                
+                with tab2:
+                    # Create tabs for different visualizations
+                    viz_tab1, viz_tab2, viz_tab3 = st.tabs(["📊 Score Distribution", "📈 Scenario Comparison", "📋 Evaluation Overview"])
+                    
+                    with viz_tab1:
+                        # Histogram of evaluation scores
+                        if score_column in group.columns:
+                            try:
+                                # Ensure the score column is numeric
+                                scores = pd.to_numeric(group[score_column], errors='coerce')
+                                if scores.isna().all():
+                                    raise ValueError("No valid numeric scores found")
+                                
+                                # Create histogram
+                                fig1 = px.histogram(
+                                    x=scores,
+                                    nbins=10,
+                                    title=f"Distribution of {score_column}",
+                                    labels={"x": "Score", "count": "Number of Evaluations"},
+                                    color_discrete_sequence=['#4CAF50']
+                                )
+                                
+                                # Add vertical line at 80% threshold
+                                fig1.add_vline(x=80, line_dash="dash", line_color="red", 
+                                            annotation_text="80% Threshold", 
+                                            annotation_position="top")
+                                
+                                # Customize layout
+                                fig1.update_layout(
+                                    xaxis_range=[0, 100],
+                                    yaxis_title="Count",
+                                    showlegend=False,
+                                    plot_bgcolor='rgba(0,0,0,0)',
+                                    paper_bgcolor='rgba(0,0,0,0)',
+                                    margin=dict(l=20, r=20, t=40, b=20)
+                                )
+                                
+                                st.plotly_chart(fig1, use_container_width=True)
+                                
+                            except Exception as e:
+                                st.error(f"Error creating score distribution: {str(e)}")
+                        else:
+                            st.warning("Score column not available for visualization")
+                    
+                    with viz_tab2:
+                        # Scenario comparison bar chart
+                        if 'Scenario' in group.columns and score_column in group.columns:
+                            try:
+                                # Group by scenario and calculate average scores
+                                scenario_scores = group.groupby('Scenario')[score_column].mean().reset_index()
+                                scenario_scores = scenario_scores.sort_values(by=score_column, ascending=False)
+                                
+                                fig2 = px.bar(
+                                    scenario_scores,
+                                    x='Scenario',
+                                    y=score_column,
+                                    title=f"Average {score_column} by Scenario",
+                                    color=score_column,
+                                    color_continuous_scale='RdYlGn',
+                                    range_color=[0, 100],
+                                    text_auto='.1f'
+                                )
+                                
+                                fig2.update_layout(
+                                    xaxis_title="Scenario",
+                                    yaxis_title=score_column,
+                                    yaxis_range=[0, 100],
+                                    coloraxis_showscale=False,
+                                    plot_bgcolor='rgba(0,0,0,0)',
+                                    paper_bgcolor='rgba(0,0,0,0)'
+                                )
+                                
+                                fig2.update_traces(
+                                    texttemplate='%{y:.1f}%',
+                                    textposition='outside'
+                                )
+                                
+                                st.plotly_chart(fig2, use_container_width=True)
+                                
+                            except Exception as e:
+                                st.error(f"Error creating scenario comparison: {str(e)}")
+                        else:
+                            st.warning("Required columns not available for scenario comparison")
+                    
+                    with viz_tab3:
+                        # Evaluation metrics overview
+                        try:
+                            # Create metrics cards
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                avg_score = pd.to_numeric(group[score_column], errors='coerce').mean()
+                                st.metric("Average Score", f"{avg_score:.1f}%")
+                            with col2:
+                                median_score = pd.to_numeric(group[score_column], errors='coerce').median()
+                                st.metric("Median Score", f"{median_score:.1f}%")
+                            with col3:
+                                # Get the current scenario name
+                                scenario_name = group_name if 'Scenario' in group.columns else 'All Scenarios'
+                                print(f"\n=== Calculating Pass Rate for {scenario_name} ===")
+                                
+                                # Get the status column name (handles both original and renamed columns)
+                                status_col = 'Direct Answer Status' if 'Direct Answer Status' in group else status_column
+                                
+                                # Ensure we have the status column
+                                if status_col not in group.columns:
+                                    print(f"Warning: Status column '{status_col}' not found in group columns")
+                                    print(f"Available columns: {group.columns.tolist()}")
+                                    pass_rate = 10.0
+                                else:
+                                    # Get all rows for this scenario across all runs
+                                    print(f"\n=== Debug: Getting rows for scenario '{group_name}' ===")
+                                    print(f"Group column: {group_column}")
+                                    print(f"Unique values in group_column: {df_display[group_column].unique()}")
+                                    
+                                    scenario_mask = df_display[group_column] == group_name
+                                    print(f"Scenario mask sum (should be > 0): {scenario_mask.sum()}")
+                                    
+                                    scenario_data = df_display[scenario_mask]
+                                    
+                                    # Debug info
+                                    print(f"\nTotal rows for scenario '{group_name}': {len(scenario_data)}")
+                                    if len(scenario_data) == 0:
+                                        print("WARNING: No data found for this scenario!")
+                                        print(f"Available scenarios: {df_display[group_column].unique()}")
+                                        print(f"Group name type: {type(group_name)}")
+                                        print(f"Group name value: {repr(group_name)}")
+                                    
+                                    print("\nStatus value counts:")
+                                    print(scenario_data[status_col].value_counts(dropna=False))
+                                    
+                                    # Calculate pass rate for the scenario
+                                    if len(scenario_data) > 0:
+                                        # Debug: Print first few status values with their types
+                                        print("\nFirst few status values with types:")
+                                        for i, val in enumerate(scenario_data[status_col].head().values):
+                                            print(f"  {i}: {repr(val)} (type: {type(val)})")
+                                        
+                                        # Convert to string and strip whitespace for comparison
+                                        status_values = scenario_data[status_col].astype(str).str.strip()
+                                        pass_icon = str(PASS_ICON).strip()
+                                        
+                                        print(f"\nComparing with PASS_ICON: {repr(pass_icon)} (type: {type(pass_icon)})")
+                                        
+                                        # Debug: Print first few comparisons
+                                        print("\nFirst few comparisons:")
+                                        for i, val in enumerate(status_values.head().values):
+                                            print(f"  {i}: {repr(val)} == {repr(pass_icon)} -> {val == pass_icon}")
+                                        
+                                        is_pass = status_values == pass_icon
+                                        
+                                        pass_count = is_pass.sum()
+                                        total_count = len(scenario_data)
+                                        pass_rate = (pass_count / total_count) * 100 if total_count > 0 else 0.0
+                                        
+                                        print(f"\nPass Count: {pass_count}/{total_count}")
+                                        print(f"Pass Rate: {pass_rate:.1f}%")
+                                        
+                                        # Debug: Print unique status values found
+                                        print("\nAll unique status values found:")
+                                        print(scenario_data[status_col].astype(str).str.strip().unique())
+                                    else:
+                                        pass_rate = 11.0
+                                        print("No data for this scenario")
+                                
+                                print("=" * 40 + "\n")
+                                st.metric("Pass Rate", f"{pass_rate:.1f}%")
+                            
+                            # Add pass/fail pie chart
+                            if status_column in group.columns:
+                                status_counts = group[status_column].value_counts().reset_index()
+                                status_counts.columns = ['Direct Answer Status', 'Count']
+                                
+                                fig3 = px.pie(
+                                    status_counts,
+                                    names='Direct Answer Status',
+                                    values='Count',
+                                    title="Pass/Fail Distribution",
+                                    color='Direct Answer Status',
+                                    color_discrete_map={
+                                        '✅': '#4CAF50',
+                                        '❌': '#f44336'
+                                    }
+                                )
+                                
+                                fig3.update_traces(
+                                    textposition='inside',
+                                    textinfo='percent+label',
+                                    hole=.4
+                                )
+                                
+                                st.plotly_chart(fig3, use_container_width=True)
+                            
+                        except Exception as e:
+                            st.error(f"Error creating evaluation overview: {str(e)}")
+
+# Main Evaluation Function
+
+def calculate_component_consistency(group, field_name, is_set_comparison=True):
+    """Calculate consistency for a specific component across runs.
+    
+    Args:
+        group: DataFrame group containing multiple runs of the same question
+        field_name: Name of the field to check consistency for
+        is_set_comparison: If True, compares as sets (for JIRA IDs), otherwise as strings (for answers)
+        
+    Returns:
+        float: Consistency percentage (0-100)
+    """
+    if len(group) < 2:
+        return 0.0  # Not enough runs to calculate consistency
+        
+    from itertools import combinations
+    total_pairs = 0
+    matching_pairs = 0
+    
+    for (_, run1), (_, run2) in combinations(group.iterrows(), 2):
+        total_pairs += 1
+        
+        if is_set_comparison:
+            # For JIRA IDs, compare as sets after splitting
+            val1 = set(str(run1.get(field_name, '')).split(','))
+            val2 = set(str(run2.get(field_name, '')).split(','))
+            match = val1 == val2
+        else:
+            # For answers, compare as strings
+            val1 = str(run1.get(field_name, '')).strip()
+            val2 = str(run2.get(field_name, '')).strip()
+            match = val1 == val2
+            
+        if match:
+            matching_pairs += 1
+    
+    return round((matching_pairs / total_pairs) * 100, 2) if total_pairs > 0 else 0.0
+
+def calculate_error_coverage_metrics(group):
+    """Calculate various metrics for LLM responses across runs.
+    
+    Args:
+        group: DataFrame group containing responses for a single scenario/question
+        
+    Returns:
+        dict: Dictionary containing various metrics
+    """
+    # Debug: Print group info
+    print("\n--- calculate_error_coverage_metrics called ---")
+    print(f"Group type: {type(group)}")
+    print(f"Group size: {len(group)}")
+    print(f"Group columns: {group.columns.tolist()}")
+    
+    if len(group) > 0:
+        print("\nFirst 2 rows of data:")
+        for col in group.columns:
+            print(f"{col}: {group[col].iloc[0]}")
+            if len(group) > 1:
+                print(f"{col} (row 2): {group[col].iloc[1]}")
+    
+    print("\n--- Starting row processing ---")
+    
+    total_responses = len(group)
+    if total_responses == 0:
+        return {}
+    
+    # Initialize counters for analyzed JIRAs
+    missing_analyzed_jira = 0
+    extra_analyzed_jira = 0
+    
+    # Initialize counters for interpretation JIRAs
+    missing_interpretation_jira = 0
+    extra_interpretation_jira = 0
+    
+    unanswered_count = 0
+    answer_lengths = []
+    
+    for idx, row in group.iterrows():
+        print(f"\n--- Processing row {idx} ---")
+
+        print("roww", row)
+
+        print("Answerrr212")
+        print(row.get('Predicted Answer'))
+        print("-----------")
+
+        
+        # Check for unanswered questions
+        answer = str(row.get('Predicted Answer', '')).strip()
+        if answer and answer.lower() not in ['', 'nan', 'none', 'n/a', 'nan.0', 'null', None]:
+            print(f"Answer found: '{answer}'")
+            answer_lengths.append(len(answer))
+        else:
+            print("Answerrr1")
+            print(answer)
+            print("-----------")
+            print("No valid answer found - counting as unanswered")
+            unanswered_count += 1
+        
+        # Get Analyzed JIRA sets
+        expected_raw = str(row.get('Expected Jira ID Analyzed', '')).strip()
+        predicted_raw = str(row.get('Predicted Jira ID Analyzed', '')).strip()
+        
+        # Debug: Print raw values
+        
+        
+        # Split and normalize JIRA IDs (case-insensitive comparison)
+        expected_analyzed = {jid.strip().upper() for jid in expected_raw.split(',') if jid.strip()}
+        predicted_analyzed = {jid.strip().upper() for jid in predicted_raw.split(',') if jid.strip()}
+
+        print("Expected Analyzed:", expected_analyzed)
+        print("Predicted Analyzed:", predicted_analyzed)
+
+        print("kkk", row.get('Expected Interpretation Jira'))
+        print("lll", row.get('Predicted Interpretation Jira'))
+        
+        
+        # Get Interpretation JIRA sets
+        expected_interpretation_raw = str(row.get('Expected Interpretation Jira', '')).strip()
+        predicted_interpretation_raw = str(row.get('Predicted Interpretation Jira', '')).strip()
+        
+        print("\n--- Raw Interpretation JIRA Values ---")
+        print(f"Raw Expected: '{expected_interpretation_raw}'")
+        print(f"Raw Predicted: '{predicted_interpretation_raw}'")
+        
+        # Split and normalize Interpretation JIRA IDs (case-insensitive comparison)
+        expected_interpretation = {jid.strip().upper() for jid in expected_interpretation_raw.split(',') if jid.strip()}
+        predicted_interpretation = {jid.strip().upper() for jid in predicted_interpretation_raw.split(',') if jid.strip()}
+        
+        print(f"Processed Expected: {expected_interpretation}")
+        print(f"Processed Predicted: {predicted_interpretation}")
+        
+        
+        
+        if expected_analyzed:
+            missing = expected_analyzed - predicted_analyzed
+            missing_ratio = len(missing) / len(expected_analyzed) if expected_analyzed else 0
+            missing_analyzed_jira += missing_ratio
+            
+            
+        if predicted_analyzed:
+            extra = predicted_analyzed - expected_analyzed
+            extra_ratio = len(extra) / len(predicted_analyzed) if predicted_analyzed else 0
+            extra_analyzed_jira += extra_ratio
+            
+           
+        # Calculate missing and extra for Interpretation JIRAs
+        print("\n--- Interpretation JIRA Debug ---")
+        print(f"Expectedq: {expected_interpretation}")
+        print(f"Predicted: {predicted_interpretation}")
+        
+        if expected_interpretation:
+            missing = expected_interpretation - predicted_interpretation
+            missing_ratio = len(missing) / len(expected_interpretation)
+            missing_interpretation_jira += missing_ratio
+            print(f"Missing: {missing} (Ratio: {missing_ratio:.2f})")
+        else:
+            print("No expected interpretation JIRAs")
+            
+        if predicted_interpretation:
+            extra = predicted_interpretation - expected_interpretation
+            extra_ratio = len(extra) / len(predicted_interpretation)
+            extra_interpretation_jira += extra_ratio
+            print(f"Extra: {extra} (Ratio: {extra_ratio:.2f})")
+        else:
+            print("No predicted interpretation JIRAs")
+            
+        print(f"Running totals - Missing: {missing_interpretation_jira:.2f}, Extra: {extra_interpretation_jira:.2f}")
+    
+
+    
+    
+    
+    
+    # Calculate final rates with debug info
+    if total_responses > 0:
+        missing_analyzed_rate = round((missing_analyzed_jira / total_responses) * 100, 2)
+        extra_analyzed_rate = round((extra_analyzed_jira / total_responses) * 100, 2)
+        
+        
+    else:
+        missing_analyzed_rate = 0
+        extra_analyzed_rate = 0
+    
+    metrics = {
+        # Analyzed JIRA metrics
+        'Missing Analyzed JIRA Rate (%)': missing_analyzed_rate,
+        'Extra Analyzed JIRA Rate (%)': extra_analyzed_rate,
+        
+        # Interpretation JIRA metrics
+        'Missing Interpretation JIRA Rate (%)': round((missing_interpretation_jira / total_responses) * 100, 2) if total_responses > 0 else 0,
+        'Extra Interpretation JIRA Rate (%)': round((extra_interpretation_jira / total_responses) * 100, 2) if total_responses > 0 else 0,
+        
+        # General metrics
+        'Unanswered Rate (%)': round((unanswered_count / total_responses) * 100, 2) if total_responses > 0 else 0,
+    }
+    
+    # Calculate answer length variation (coefficient of variation)
+    if len(answer_lengths) > 1 and sum(answer_lengths) > 0:
+        import numpy as np
+        metrics['Answer Length Variation'] = round((np.std(answer_lengths) / np.mean(answer_lengths)) * 100, 2)
+    else:
+        metrics['Answer Length Variation'] = 0.0
+        
+    return metrics
+
+def calculate_consistency(group):
+    """Calculate consistency of all components across runs for a question.
+    
+    Args:
+        group: DataFrame group containing multiple runs of the same question
+        
+    Returns:
+        dict: Dictionary containing consistency scores for each component and overall
+    """
+    if len(group) < 2:
+        return {
+            'Consistency (Analyzed JIRA)': 0.0,
+            'Consistency (Interpretation JIRA)': 0.0,
+            'Consistency (Answer)': 0.0,
+            'Overall Consistency': 0.0
+        }
+        
+    # Calculate consistency for each component
+    analyzed_consistency = calculate_component_consistency(
+        group, 'Predicted Jira ID Analyzed', is_set_comparison=True
+    )
+    interp_consistency = calculate_component_consistency(
+        group, 'Predicted Interpretation Jira', is_set_comparison=True
+    )
+    answer_consistency = calculate_component_consistency(
+        group, 'Predicted Answer', is_set_comparison=False
+    )
+    
+    # Calculate overall consistency (all components must match)
+    from itertools import combinations
+    total_pairs = 0
+    matching_pairs = 0
+    
+    for (_, run1), (_, run2) in combinations(group.iterrows(), 2):
+        total_pairs += 1
+        
+        # Check all components
+        analyzed_match = set(str(run1.get('Predicted Jira ID Analyzed', '')).split(',')) == \
+                         set(str(run2.get('Predicted Jira ID Analyzed', '')).split(','))
+        interp_match = set(str(run1.get('Predicted Interpretation Jira', '')).split(',')) == \
+                       set(str(run2.get('Predicted Interpretation Jira', '')).split(','))
+        answer_match = str(run1.get('Predicted Answer', '')).strip() == \
+                      str(run2.get('Predicted Answer', '')).strip()
+        
+        if analyzed_match and interp_match and answer_match:
+            matching_pairs += 1
+    
+    overall_consistency = round((matching_pairs / total_pairs) * 100, 2) if total_pairs > 0 else 0.0
+    
+    return {
+        'Consistency (Analyzed JIRA)': analyzed_consistency,
+        'Consistency (Interpretation JIRA)': interp_consistency,
+        'Consistency (Answer)': answer_consistency,
+        'Overall Consistency': overall_consistency
+    }
+
+async def evaluate_direct_answer(client):
+    """Run the evaluation process."""
+    out_file, df = await run_regression(INPUT_CSV, OUTPUT_DIR, client, runs=4, result_type='direct_answer')
+    st.info(f"📊 **Results saved to:** `{out_file}`")
+    st.markdown("---")
+
+    # Convert Answer Quality Score from percentage string to float for calculation
+    if 'Answer Quality Score' in df.columns:
+        df['Answer Quality Score'] = df['Answer Quality Score'].apply(
+            lambda x: float(str(x).rstrip('%')) if pd.notna(x) and isinstance(x, str) and '%' in x else x
+        )
+
+    # Calculate consistency, variance, and LLM metrics across runs
+    consistency_results = []
+    variance_results = []
+    error_coverage_metrics_results = []
+    
+    for (scenario, question), group in df.groupby(['Scenario', 'Question']):
+        print(f"\n--- Processing Scenario {scenario}, Question {question} ---")
+        print(f"Group size: {len(group)}")
+        
+        # Calculate LLM metrics (works with any group size >= 1)
+        metrics_data = calculate_error_coverage_metrics(group)
+        metrics_data['Scenario'] = scenario
+        metrics_data['Question'] = question
+        error_coverage_metrics_results.append(metrics_data)
+        
+        # Only calculate consistency if we have at least 2 runs
+        if len(group) >= 2:
+            # Calculate consistency
+            consistency = calculate_consistency(group)
+            consistency['Scenario'] = scenario
+            consistency['Question'] = question
+            consistency_results.append(consistency)
+            
+            # Calculate score variance
+            metrics = [
+                'Jira Match Accuracy', 
+                'Interpretation Jira Match Accuracy', 
+                'Answer Quality Score'
+            ]
+            
+            variance_data = {'Scenario': scenario, 'Question': question}
+            
+            for metric in metrics:
+                scores = group[metric].dropna()
+                if len(scores) >= 2:  # Need at least 2 values to calculate std
+                    std_dev = scores.std()
+                    variance = (std_dev / scores.mean()) * 100 if scores.mean() > 0 else 0
+                    variance_data[f'Variance ({metric})'] = round(variance, 2)
+                else:
+                    variance_data[f'Variance ({metric})'] = 0.0
+            
+            # Calculate average variance across all metrics
+            variance_metrics = [v for k, v in variance_data.items() if k.startswith('Variance (')]
+            variance_data['Average Variance (%)'] = round(sum(variance_metrics) / len(variance_metrics), 2) if variance_metrics else 0.0
+            variance_results.append(variance_data)
+    
+    # Process and display consistency results
+    if consistency_results:
+        consistency_df = pd.DataFrame(consistency_results)
+        
+        # Calculate average consistency for each scenario
+        scenario_consistency = consistency_df.groupby('Scenario').agg({
+            'Consistency (Analyzed JIRA)': 'mean',
+            'Consistency (Interpretation JIRA)': 'mean',
+            'Consistency (Answer)': 'mean',
+            'Overall Consistency': 'mean'
+        }).reset_index()
+        
+        # Round the values for display
+        for col in scenario_consistency.columns[1:]:  # Skip 'Scenario' column
+            scenario_consistency[col] = scenario_consistency[col].round(2)
+        
+        # Display consistency metrics
+        st.subheader("🔄 Consistency Across Runs")
+        
+        # Show average consistency for each component
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Avg Analyzed JIRA", f"{scenario_consistency['Consistency (Analyzed JIRA)'].mean():.1f}%")
+        with col2:
+            st.metric("Avg Interpretation JIRA", f"{scenario_consistency['Consistency (Interpretation JIRA)'].mean():.1f}%")
+        with col3:
+            st.metric("Avg Answer", f"{scenario_consistency['Consistency (Answer)'].mean():.1f}%")
+        with col4:
+            st.metric("Overall Avg", f"{scenario_consistency['Overall Consistency'].mean():.1f}%")
+        
+        # Show consistency by scenario with all components
+        st.write("### Consistency by Scenario")
+        
+        # Function to apply color based on value
+        def color_consistency(val):
+            if pd.isna(val):
+                return 'background-color: white'
+            if val >= 80:  # Green
+                return 'background-color: #33cc33'  # Bright green
+            elif val >= 60:  # Light green
+                return 'background-color: #99ff99'  # Light green
+            elif val >= 40:  # Yellow
+                return 'background-color: #ffff99'  # Yellow
+            elif val >= 20:  # Orange
+                return 'background-color: #ffcc99'  # Light orange
+            else:  # Red
+                return 'background-color: #ff9999'  # Light red
+        
+        # Apply styling
+        styled_df = scenario_consistency.sort_values('Overall Consistency', ascending=False).style\
+            .applymap(color_consistency, subset=['Consistency (Analyzed JIRA)'])\
+            .applymap(color_consistency, subset=['Consistency (Interpretation JIRA)'])\
+            .applymap(color_consistency, subset=['Consistency (Answer)'])\
+            .applymap(color_consistency, subset=['Overall Consistency'])\
+            .set_properties(**{'text-align': 'center'})
+        
+        st.dataframe(styled_df, use_container_width=True)
+        
+        # Add to main dataframe for further analysis
+        df = df.merge(consistency_df, on=['Scenario', 'Question'], how='left')
+        
+        # Display variance analysis
+        st.markdown("---")
+        st.subheader("📊 Output Variability Analysis")
+        
+        # Calculate and display variability metrics
+        if variance_results:
+            variance_df = pd.DataFrame(variance_results)
+            
+            # Calculate average variability metrics
+            avg_analyzed_var = variance_df['Variance (Jira Match Accuracy)'].mean()
+            avg_interp_var = variance_df['Variance (Interpretation Jira Match Accuracy)'].mean()
+            avg_answer_var = variance_df['Variance (Answer Quality Score)'].mean()
+            overall_var = (avg_analyzed_var + avg_interp_var + avg_answer_var) / 3
+            
+            # Display in columns
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Avg Analyzed JIRA Variability", f"{avg_analyzed_var:.1f}%")
+            with col2:
+                st.metric("Avg Interpretation JIRA Variability", f"{avg_interp_var:.1f}%")
+            with col3:
+                st.metric("Avg Answer Quality Variability", f"{avg_answer_var:.1f}%")
+            with col4:
+                st.metric("Overall Avg Variability", f"{overall_var:.1f}%")
+            
+            # Display average variance metrics
+            avg_variance = variance_df['Average Variance (%)'].mean()
+            # st.metric("Average Output Variability", f"{avg_variance:.1f}%")
+            
+            # Show most and least consistent questions
+            st.write("### Questions by Variability")
+            
+            # Most variable questions
+            st.write("#### Most Variable Questions (highest average variance)")
+            most_variable = variance_df.nlargest(3, 'Average Variance (%)')
+            st.dataframe(
+                most_variable[['Scenario', 'Question', 'Average Variance (%)']]
+                .style.background_gradient(cmap='YlOrRd', subset=['Average Variance (%)']),
+                use_container_width=True
+            )
+            
+            # Least variable questions
+            st.write("#### Most Consistent Questions (lowest average variance)")
+            least_variable = variance_df.nsmallest(3, 'Average Variance (%)')
+            st.dataframe(
+                least_variable[['Scenario', 'Question', 'Average Variance (%)']]
+                .style.background_gradient(cmap='YlGn', subset=['Average Variance (%)']),
+                use_container_width=True
+            )
+            
+            # Detailed variance by metric
+            st.write("### Detailed Variability by Metric")
+            st.dataframe(
+                variance_df.sort_values('Average Variance (%)', ascending=False)
+                .style.background_gradient(cmap='YlOrRd', subset=['Average Variance (%)'])
+                .background_gradient(cmap='YlOrRd', subset=[c for c in variance_df.columns if c.startswith('Variance (')]),
+                use_container_width=True
+            )
+            
+            # Add variance data to main dataframe
+            df = df.merge(variance_df, on=['Scenario', 'Question'], how='left')
+            
+        # Display LLM metrics analysis
+        st.markdown("---")
+        st.subheader("📈 Error & Coverage Metrics")
+        
+        if error_coverage_metrics_results:
+            metrics_df = pd.DataFrame(error_coverage_metrics_results)
+            
+            # Calculate and display average metrics
+            avg_metrics = {
+                # Analyzed JIRA metrics
+                'Missing Analyzed JIRA Rate (%)': metrics_df['Missing Analyzed JIRA Rate (%)'].mean(),
+                'Extra Analyzed JIRA Rate (%)': metrics_df['Extra Analyzed JIRA Rate (%)'].mean(),
+                
+                # Interpretation JIRA metrics
+                'Missing Interpretation JIRA Rate (%)': metrics_df['Missing Interpretation JIRA Rate (%)'].mean(),
+                'Extra Interpretation JIRA Rate (%)': metrics_df['Extra Interpretation JIRA Rate (%)'].mean(),
+                
+                # General metrics
+                'Unanswered Rate (%)': metrics_df['Unanswered Rate (%)'].mean(),
+                'Answer Length Variation': metrics_df['Answer Length Variation'].mean()
+            }
+            
+            # Create a container for better organization
+            with st.container():
+                
+                col1, col2, col3, col4, col5, col6 = st.columns(6)
+                with col1:
+                    st.metric("Missing Analyzed JIRA Rate (%)", f"{avg_metrics['Missing Analyzed JIRA Rate (%)']:.1f}%")
+                with col2:
+                    st.metric("Extra Analyzed JIRA Rate (%)", f"{avg_metrics['Extra Analyzed JIRA Rate (%)']:.1f}%")
+                
+                with col3:
+                    st.metric("Missing Interpretation JIRA Rate (%)", f"{avg_metrics['Missing Interpretation JIRA Rate (%)']:.1f}%")
+                with col4:
+                    st.metric("Extra Interpretation JIRA Rate (%)", f"{avg_metrics['Extra Interpretation JIRA Rate (%)']:.1f}%")
+                
+                with col5:
+                    st.metric("Unanswered Rate (%)", f"{avg_metrics['Unanswered Rate (%)']:.1f}%")
+                with col6:
+                    st.metric("Answer Length Variation", f"{avg_metrics['Answer Length Variation']:.1f}%")
+                
+                # Add some visual separation
+                # st.markdown("---")
+            
+            # Show metrics by scenario in an expandable section
+            # with st.expander("📋 View Detailed Metrics by Scenario", expanded=False):
+                st.markdown("### 📋 Metrics by Scenario")
+                
+                # Group by scenario and calculate mean for each metric
+                scenario_metrics = metrics_df.groupby('Scenario').agg({
+                    'Missing Analyzed JIRA Rate (%)': 'mean',
+                    'Extra Analyzed JIRA Rate (%)': 'mean',
+                    'Missing Interpretation JIRA Rate (%)': 'mean',
+                    'Extra Interpretation JIRA Rate (%)': 'mean',
+                    'Unanswered Rate (%)': 'mean',
+                    'Answer Length Variation': 'mean'
+                }).reset_index()
+            
+            # Round the values for display
+            for col in scenario_metrics.columns[1:]:  # Skip 'Scenario' column
+                scenario_metrics[col] = scenario_metrics[col].round(2)
+            
+            # Function to apply color based on value (same as consistency for direct comparison)
+            def color_variability(val):
+                if pd.isna(val):
+                    return 'background-color: white'
+                if val >= 80:  # Bright Green
+                    return 'background-color: #33cc33'
+                elif val >= 60:  # Light Green
+                    return 'background-color: #99ff99'
+                elif val >= 40:  # Yellow
+                    return 'background-color: #ffff99'
+                elif val >= 20:  # Orange
+                    return 'background-color: #ffcc99'
+                else:  # Light Red
+                    return 'background-color: #ff9999'
+            
+            # Sort by Missing JIRA Rate (ascending) to match consistency sorting
+            scenario_metrics = scenario_metrics.sort_values('Missing Analyzed JIRA Rate (%)')
+            
+            # Create styled dataframe
+            styled_metrics = scenario_metrics.style
+            
+            # Apply styling to each column
+            for col in ['Missing Analyzed JIRA Rate (%)', 'Extra Analyzed JIRA Rate (%)', 
+                        'Missing Interpretation JIRA Rate (%)', 'Extra Interpretation JIRA Rate (%)',
+                       'Unanswered Rate (%)', 'Answer Length Variation']:
+                if col in scenario_metrics.columns:
+                    styled_metrics = styled_metrics.applymap(
+                        color_variability, 
+                        subset=[col]
+                    )
+            
+            # Apply center alignment and display
+            styled_metrics = styled_metrics.set_properties(**{'text-align': 'center'})
+            st.dataframe(styled_metrics, use_container_width=True)
+            
+            # Add metrics to main dataframe for further analysis
+            df = df.merge(metrics_df, on=['Scenario', 'Question'], how='left')
+
+    # Calculate and display build score
+    build_score = (df["Jira Match Accuracy"].mean() + df["Interpretation Jira Match Accuracy"].mean() + df["Answer Quality Score"].mean()) / 3
+    st.subheader(f"Overall Evaluation Score: {build_score:.2f}")
+
+    # Display summary metrics
+    display_summary_table(df, metrics=["Jira Match Accuracy", "Interpretation Jira Match Accuracy", "Answer Quality Score"])
+
+    # Display scenario summary and collapsible tables
+    display_collapsible_tables(df, group_column="Scenario", score_column="Overall Evaluation Score", status_column="Direct Answer Status")
