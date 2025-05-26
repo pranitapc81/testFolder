@@ -1,0 +1,142 @@
+"""Main regression runner module."""
+import asyncio
+import logging
+from typing import List, Dict, Any, Tuple, Optional
+import pandas as pd
+
+from utils.file_utils import ensure_directory_exists, get_output_file_path
+from processors import ProcessorFactory
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+class RegressionRunner:
+    """Main class for running regression tests."""
+    
+    def __init__(self, client, output_dir: str = 'output'):
+        """Initialize the regression runner.
+        
+        Args:
+            client: API client instance.
+            output_dir: Directory to save output files.
+        """
+        self.client = client
+        self.output_dir = output_dir
+        ensure_directory_exists(output_dir)
+    
+    async def process_single_row(self, row: pd.Series, result_type: str, run_id: int) -> Optional[Dict[str, Any]]:
+        """Process a single row of input data.
+        
+        Args:
+            row: Input data row.
+            result_type: Type of result to process ('direct_answer' or 'implementation_answer').
+            run_id: Current run ID.
+            
+        Returns:
+            Dictionary with processed results or None if processing failed.
+        """
+        try:
+            question = row.get('Question')
+            answer_mode = row.get('Answer Mode')
+
+            if not question or not answer_mode:
+                logger.warning("Skipping row: 'Question' or 'Answer Mode' is missing.")
+                print("Skipping row: 'Question' or 'Answer Mode' is missing.")
+                print("Question: ", question)
+                print("Answer Mode: ", answer_mode)
+                print("Scenarito: ", row)
+                return None
+
+            logger.info(f"Processing scenario: {row.get('Scenario')} (Run {run_id})")
+            print("Processing scenario: ", row.get('Scenario'), " (Run ", run_id, ")")
+            response = await self.client.call(question, answer_mode, run_id)
+
+            # Get the appropriate processor
+            processor = ProcessorFactory.get_processor(result_type)
+            if not processor:
+                logger.error(f"No processor found for type: {result_type}")
+                return None
+
+            # Process the response
+            result = {
+                "Scenario": row.get('Scenario'),
+                "Question": question,
+                "Predicted Answer": response.get('answer'),
+                "Expected Answer": row.get('Expected Answer'),
+                "Run": run_id,
+            }
+
+            # Add processor-specific results
+            processor_result = await processor.process(response, row, self.client)
+            result.update(processor_result)
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error processing scenario {row.get('Scenario')}: {str(e)}", exc_info=True)
+            return None
+    
+    async def run_regression(
+        self,
+        input_csv: str,
+        result_type: str,
+        runs: int = 4,
+        max_concurrent: int = 5
+    ) -> Tuple[str, pd.DataFrame]:
+        """Run the regression process.
+        
+        Args:
+            input_csv: Path to input CSV file.
+            result_type: Type of results to generate.
+            runs: Number of runs to perform.
+            max_concurrent: Maximum number of concurrent requests.
+            
+        Returns:
+            Tuple of (output_file_path, results_dataframe)
+        """
+        try:
+            # Read input data
+            data = pd.read_csv(input_csv)
+            results = []
+            
+            # Process all runs
+            for run_id in range(1, runs + 1):
+                logger.info(f"Starting run {run_id} of {runs}")
+                
+                # Process rows with limited concurrency
+                semaphore = asyncio.Semaphore(max_concurrent)
+                
+                async def process_with_semaphore(row):
+                    async with semaphore:
+                        return await self.process_single_row(row, result_type, run_id)
+                
+                tasks = [process_with_semaphore(row) for _, row in data.iterrows()]
+                run_results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # Filter out None results and exceptions
+                valid_results = [r for r in run_results if r is not None and not isinstance(r, Exception)]
+                results.extend(valid_results)
+            
+            # Sort results by Scenario and Run
+            results.sort(key=lambda x: (x["Scenario"], x["Run"]))
+            
+            # Save results to CSV
+            prefix = 'DIRECT_ANSWER_EVALUATION_RESULT' if result_type == 'direct_answer' else 'Evaluation_Result'
+            output_file = get_output_file_path(self.output_dir, prefix=prefix)
+            output_df = pd.DataFrame(results)
+            output_df.to_csv(output_file, index=False)
+            
+            logger.info("\n" + "="*50)
+            logger.info(f"✅ REGRESSION COMPLETED SUCCESSFULLY")
+            logger.info(f"📊 Results saved to: {output_file}")
+            logger.info("="*50 + "\n")
+            
+            return output_file, output_df
+            
+        except Exception as e:
+            logger.error(f"Error in run_regression: {str(e)}", exc_info=True)
+            raise
