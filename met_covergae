@@ -1,0 +1,76 @@
+"""Coverage calculation utilities."""
+from typing import Set, Union, List
+import re
+
+PR_ID_PATTERN = re.compile(r'\bPR-\d+\b')
+
+def calculate_coverage(predicted: Set[str], expected: Set[str]) -> float:
+    """Calculate coverage percentage between predicted and expected sets.
+    
+    Args:
+        predicted: Set of predicted items.
+        expected: Set of expected items.
+        
+    Returns:
+        float: Coverage percentage (0-100).
+    """
+    if not expected:
+        return 0.0
+    
+    intersection = predicted.intersection(expected)
+    return (len(intersection) / len(expected)) * 100
+
+def parse_expected_values(expected_raw: Union[str, List[str]]) -> Set[str]:
+    """Parse expected values into a set.
+    
+    Args:
+        expected_raw: Raw expected values as string or list.
+        
+    Returns:
+        Set of parsed values.
+    """
+    if not expected_raw:
+        return set()
+        
+    if isinstance(expected_raw, str):
+        if expected_raw.startswith('[') and expected_raw.endswith(']'):
+            import ast
+            try:
+                return set(ast.literal_eval(expected_raw))
+            except (ValueError, SyntaxError):
+                pass
+        return set(filter(None, (x.strip() for x in expected_raw.split(','))))
+    
+    return set(expected_raw)
+
+def calculate_pr_coverage(predicted_raw: str, expected_raw: str) -> float:
+    """Calculate PR coverage between predicted and expected PRs.
+    
+    Args:
+        predicted_raw: Raw string of predicted PRs.
+        expected_raw: Raw string of expected PRs.
+        
+    Returns:
+        float: PR coverage percentage.
+    """
+    predicted = set(PR_ID_PATTERN.findall(predicted_raw or ''))
+    expected = parse_expected_values(expected_raw)
+    return calculate_coverage(predicted, expected)
+
+def process_jira_ids(ids_str: str) -> Set[str]:
+    """Process JIRA IDs from a string into a set.
+    
+    Args:
+        ids_str: String containing JIRA IDs.
+        
+    Returns:
+        Set of processed JIRA IDs with whitespace stripped.
+    """
+    if not ids_str:
+        return set()
+    
+    if isinstance(ids_str, str):
+        # Split on commas and strip whitespace
+        return set(x.strip() for x in ids_str.split(',') if x.strip())
+    
+    return set(ids_str)
