@@ -1,0 +1,21 @@
+"""Base processor for handling different answer types."""
+from abc import ABC, abstractmethod
+from typing import Dict, Any, Optional
+import pandas as pd
+
+class BaseProcessor(ABC):
+    """Abstract base class for answer processors."""
+    
+    @abstractmethod
+    async def process(self, response: Dict[str, Any], row: pd.Series, client) -> Dict[str, Any]:
+        """Process the API response and calculate metrics.
+        
+        Args:
+            response: API response dictionary.
+            row: Input data row.
+            client: API client instance.
+            
+        Returns:
+            Dictionary containing processed results.
+        """
+        pass
