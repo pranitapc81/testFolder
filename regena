@@ -1,0 +1,100 @@
+"""Main module for running regression tests.
+
+This module provides a simplified interface to the regression testing framework.
+"""
+import asyncio
+import logging
+from typing import List, Dict, Any, Tuple, Optional
+import pandas as pd
+
+from api_client import APIClient
+from regression_runner import RegressionRunner
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Backwards compatibility functions for existing code
+def ensure_directory_exists(directory: str) -> None:
+    """Ensure the directory exists.
+    
+    Args:
+        directory: Path to the directory to create if it doesn't exist.
+    """
+    import os
+    os.makedirs(directory, exist_ok=True)
+
+async def run_regression(
+    input_csv: str,
+    output_dir: str,
+    client: APIClient,
+    result_type: str,
+    runs: int = 4,
+    max_concurrent: int = 5
+) -> Tuple[str, pd.DataFrame]:
+    """Run the regression process with the new modular structure.
+    
+    This is a backwards-compatible wrapper around the new RegressionRunner class.
+    
+    Args:
+        input_csv: Path to the input CSV file.
+        output_dir: Directory to save output files.
+        client: API client instance.
+        result_type: Type of results to generate ('direct_answer' or 'implementation_answer').
+        runs: Number of runs to perform.
+        max_concurrent: Maximum number of concurrent requests.
+        
+    Returns:
+        Tuple of (output_file_path, results_dataframe)
+    """
+    try:
+        # Initialize the regression runner
+        runner = RegressionRunner(client=client, output_dir=output_dir)
+        
+        # Run the regression
+        output_file, output_df = await runner.run_regression(
+            input_csv=input_csv,
+            result_type=result_type,
+            runs=runs,
+            max_concurrent=max_concurrent
+        )
+        
+        return output_file, output_df
+        
+    except Exception as e:
+        logger.error(f"Error in run_regression: {str(e)}", exc_info=True)
+        raise
+
+# For backwards compatibility
+if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Run regression tests.')
+    parser.add_argument('--input', type=str, required=True, help='Path to input CSV file')
+    parser.add_argument('--output-dir', type=str, default='output', help='Output directory')
+    parser.add_argument('--result-type', type=str, required=True, 
+                        choices=['direct_answer', 'implementation_answer'],
+                        help='Type of results to generate')
+    parser.add_argument('--runs', type=int, default=4, help='Number of runs')
+    parser.add_argument('--max-concurrent', type=int, default=5, 
+                       help='Maximum number of concurrent requests')
+    
+    args = parser.parse_args()
+    
+    # Initialize API client (you'll need to implement this part)
+    client = APIClient()  # Replace with actual client initialization
+    
+    # Run the regression
+    asyncio.run(
+        run_regression(
+            input_csv=args.input,
+            output_dir=args.output_dir,
+            client=client,
+            result_type=args.result_type,
+            runs=args.runs,
+            max_concurrent=args.max_concurrent
+        )
+    )
