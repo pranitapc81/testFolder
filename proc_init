@@ -1,0 +1,41 @@
+"""Processor factory module."""
+from typing import Dict, Type, Optional
+from .base_processor import BaseProcessor
+from .direct_answer_processor import DirectAnswerProcessor
+from .implementation_processor import ImplementationProcessor
+
+class ProcessorFactory:
+    """Factory class for creating processor instances."""
+    
+    _processors: Dict[str, Type[BaseProcessor]] = {
+        'direct_answer': DirectAnswerProcessor,
+        'implementation_answer': ImplementationProcessor,
+    }
+    
+    @classmethod
+    def get_processor(cls, processor_type: str) -> Optional[BaseProcessor]:
+        """Get a processor instance by type.
+        
+        Args:
+            processor_type: Type of processor to create.
+            
+        Returns:
+            BaseProcessor: Processor instance or None if not found.
+        """
+        processor_class = cls._processors.get(processor_type)
+        if processor_class:
+            return processor_class()
+        return None
+    
+    @classmethod
+    def register_processor(cls, processor_type: str, processor_class: Type[BaseProcessor]) -> None:
+        """Register a new processor type.
+        
+        Args:
+            processor_type: Key to register the processor under.
+            processor_class: Processor class to register.
+        """
+        if issubclass(processor_class, BaseProcessor):
+            cls._processors[processor_type] = processor_class
+        else:
+            raise ValueError(f"Processor class must be a subclass of BaseProcessor")
