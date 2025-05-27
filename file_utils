@@ -1,0 +1,33 @@
+"""Utility functions for file operations."""
+import os
+from pathlib import Path
+from typing import Optional
+
+def ensure_directory_exists(directory: str) -> None:
+    """Ensure the directory exists.
+    
+    Args:
+        directory: Path to the directory to create if it doesn't exist.
+    """
+    os.makedirs(directory, exist_ok=True)
+
+def get_timestamp() -> str:
+    """Get current timestamp in DDMMYYYY_HHMM format.
+    
+    Returns:
+        str: Formatted timestamp string.
+    """
+    from datetime import datetime
+    return datetime.now().strftime('%d%m%Y_%H%M')
+
+def get_output_file_path(output_dir: str, prefix: str = 'Evaluation_Result') -> str:
+    """Generate output file path with timestamp.
+    
+    Args:
+        output_dir: Directory to save the output file.
+        prefix: Prefix for the output filename.
+        
+    Returns:
+        str: Full path to the output file.
+    """
+    return str(Path(output_dir) / f'{prefix}_{get_timestamp()}.csv')
