@@ -1,0 +1,15 @@
+"""Metrics module for calculating various coverage and similarity metrics."""
+
+from .coverage import (
+    calculate_coverage,
+    calculate_pr_coverage,
+    parse_expected_values,
+    process_jira_ids
+)
+
+__all__ = [
+    'calculate_coverage',
+    'calculate_pr_coverage',
+    'parse_expected_values',
+    'process_jira_ids',
+]
